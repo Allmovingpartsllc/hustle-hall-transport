@@ -217,7 +217,9 @@ function accountNavigation() {
   } else {
     nav.querySelectorAll('a[href="login.html"], a[href="signup.html"]').forEach((link) => link.remove());
     const account = document.createElement('a');
-    account.className = 'account-link'; account.href = 'portal.html'; account.textContent = `Hi, ${user.name.split(' ')[0]}`;
+    account.className = 'account-link';
+    account.href = user.role === 'admin' ? 'admin.html' : 'portal.html';
+    account.textContent = user.role === 'admin' ? 'Admin Dashboard' : `Hi, ${user.name.split(' ')[0]}`;
     nav.append(account);
   }
   if (user) {
@@ -312,7 +314,8 @@ document.addEventListener('submit', async (event) => {
       if (error) throw error;
       const profile = await cloudProfile(client, result.user);
       if (next === 'admin.html' && profile.role !== 'admin') { showAuthMessage(form, 'This account does not have admin access.'); return; }
-      setCurrentUser(profile); window.location.href = next;
+      const destination = profile.role === 'admin' && next === 'index.html' ? 'admin.html' : next;
+      setCurrentUser(profile); window.location.href = destination;
     }
   } catch (error) { showAuthMessage(form, error.message || 'We could not complete that request.'); }
 }, true);
