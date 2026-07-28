@@ -34,7 +34,7 @@ if (menuButton && mainNavigation) {
 }
 
 const HHT_ORDERS = 'hht-orders';
-const PRICES = { small: 5, medium: 10, large: 20 };
+const PRICES = { small: 5, medium: 10, large: 20, extraLarge: 50 };
 const statuses = ['Requested', 'Accepted', 'Driver Assigned', 'Driver En Route', 'Picked Up', 'In Transit', 'Delivered', 'Completed'];
 const readOrders = () => JSON.parse(localStorage.getItem(HHT_ORDERS) || '[]');
 const saveOrders = (orders) => localStorage.setItem(HHT_ORDERS, JSON.stringify(orders));
@@ -383,3 +383,26 @@ function addInstagramFooterLink() {
 }
 
 addInstagramFooterLink();
+
+document.querySelectorAll('a[href="package-booking.html"]').forEach((link) => {
+  link.childNodes.forEach((node) => {
+    if (node.nodeType === Node.TEXT_NODE) node.nodeValue = node.nodeValue.replace('Send a Package', 'Start a Delivery');
+  });
+});
+
+document.querySelectorAll('.page-title').forEach((title) => {
+  if (title.textContent.trim() === 'Send a package.') title.textContent = 'Start a delivery.';
+});
+
+const packageSizeSelect = document.querySelector('select[name="packageSize"]');
+if (packageSizeSelect && !document.querySelector('.package-size-guide')) {
+  const detailsSection = packageSizeSelect.closest('section');
+  const formGrid = detailsSection?.querySelector('.form-grid');
+  const descriptionField = document.querySelector('input[name="description"]')?.closest('label');
+  detailsSection?.classList.add('package-details-section');
+  if (descriptionField && formGrid) {
+    descriptionField.classList.add('form-wide');
+    formGrid.prepend(descriptionField);
+  }
+  detailsSection?.insertAdjacentHTML('beforebegin', '<aside class="package-size-guide package-guide-card"><p class="eyebrow">Choose the right size</p><h2>Package size guide</h2><div><span><b>Small — $5</b>All small food deliveries, documents, medications, and other hand-sized items.</span><span><b>Medium — $10</b>Grocery bags, shoeboxes, retail purchases, and medium boxes.</span><span><b>Large — $20</b>Large boxes, multiple bags, and bulky items that fit safely in a standard vehicle.</span><span><b>Extra Large — from $50</b>Appliances, furniture, and other oversized items.</span></div></aside>');
+}
