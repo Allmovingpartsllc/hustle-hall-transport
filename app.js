@@ -355,3 +355,31 @@ async function renderCustomerPortal() {
 }
 
 renderCustomerPortal();
+
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch((error) => console.warn('Offline app setup failed.', error));
+  });
+}
+
+function addInstagramFooterLink() {
+  let footer = document.querySelector('.site-footer');
+  if (!footer) {
+    footer = document.createElement('footer');
+    footer.className = 'site-footer';
+    footer.innerHTML = '<div class="container footer-content"><p>Powered by ALLMOVINGPARTS LLC</p></div>';
+    document.body.append(footer);
+  }
+  const content = footer.querySelector('.footer-content') || footer;
+  if (content.querySelector('.footer-instagram')) return;
+  const link = document.createElement('a');
+  link.className = 'footer-instagram';
+  link.href = 'https://instagram.com/HustleHallTransport';
+  link.target = '_blank';
+  link.rel = 'noopener';
+  link.setAttribute('aria-label', 'Follow Hustle Hall Transport on Instagram');
+  link.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.3 2h9.4A5.3 5.3 0 0 1 22 7.3v9.4a5.3 5.3 0 0 1-5.3 5.3H7.3A5.3 5.3 0 0 1 2 16.7V7.3A5.3 5.3 0 0 1 7.3 2Zm-.2 2A3.1 3.1 0 0 0 4 7.1v9.8A3.1 3.1 0 0 0 7.1 20h9.8a3.1 3.1 0 0 0 3.1-3.1V7.1A3.1 3.1 0 0 0 16.9 4H7.1Zm9.1 1.5a1.3 1.3 0 1 1 0 2.6 1.3 1.3 0 0 1 0-2.6ZM12 6.5A5.5 5.5 0 1 1 6.5 12 5.5 5.5 0 0 1 12 6.5Zm0 2A3.5 3.5 0 1 0 15.5 12 3.5 3.5 0 0 0 12 8.5Z"/></svg><span>@HustleHallTransport</span>';
+  content.append(link);
+}
+
+addInstagramFooterLink();
