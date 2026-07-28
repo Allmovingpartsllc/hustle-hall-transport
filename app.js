@@ -41,6 +41,15 @@ const saveOrders = (orders) => localStorage.setItem(HHT_ORDERS, JSON.stringify(o
 const money = (value) => `$${Number(value || 0).toFixed(2)}`;
 const makeId = () => `HHT-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}-${String(Date.now()).slice(-5)}`;
 
+async function sendBookingNotifications(order) {
+  const response = await fetch('/api/send-booking-email', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ order })
+  });
+  if (!response.ok) throw new Error('Email notification could not be sent.');
+}
+
 function calculatePackage(form) {
   const size = form.elements.packageSize?.value || 'small';
   const base = PRICES[size];
@@ -81,6 +90,9 @@ document.querySelectorAll('[data-booking-form]').forEach((form) => {
       const { data: { user } } = await client.auth.getUser();
       if (user) await client.from('orders').upsert({ id: order.id, user_id: user.id, service: order.service, status: order.status, total: order.total, payload: order });
     } catch (error) { console.warn('Cloud booking backup unavailable.', error); }
+    try {
+      await sendBookingNotifications(order);
+    } catch (error) { console.warn('Email notification unavailable.', error); }
     window.location.href = `receipt.html?id=${encodeURIComponent(order.id)}`;
   });
 });
