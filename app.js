@@ -203,11 +203,23 @@ function accountNavigation() {
   const nav = document.querySelector('.main-nav');
   if (!nav) return;
   const user = currentUser();
-  const account = document.createElement('a');
-  account.className = 'account-link';
-  account.href = user ? 'auth.html' : 'login.html';
-  account.textContent = user ? `Hi, ${user.name.split(' ')[0]}` : 'Log in / Sign up';
-  nav.append(account);
+  if (!user) {
+    if (!nav.querySelector('a[href="login.html"]')) {
+      const login = document.createElement('a');
+      login.className = 'account-link'; login.href = 'login.html'; login.textContent = 'Log in';
+      nav.append(login);
+    }
+    if (!nav.querySelector('a[href="signup.html"]')) {
+      const signup = document.createElement('a');
+      signup.className = 'account-link'; signup.href = 'signup.html'; signup.textContent = 'Sign up';
+      nav.append(signup);
+    }
+  } else {
+    nav.querySelectorAll('a[href="login.html"], a[href="signup.html"]').forEach((link) => link.remove());
+    const account = document.createElement('a');
+    account.className = 'account-link'; account.href = 'portal.html'; account.textContent = `Hi, ${user.name.split(' ')[0]}`;
+    nav.append(account);
+  }
   if (user) {
     const logout = document.createElement('button');
     logout.className = 'logout-button'; logout.type = 'button'; logout.textContent = 'Log out';
@@ -231,7 +243,7 @@ function initializeAuthPage() {
     signupForm.hidden = !signUp; loginForm.hidden = signUp;
     tabButtons.forEach((tab) => tab.classList.toggle('is-active', tab === button));
   }));
-  const next = new URLSearchParams(location.search).get('next') || 'index.html';
+  const next = new URLSearchParams(location.search).get('next') || document.body.dataset.defaultNext || 'index.html';
   loginForm.addEventListener('submit', (event) => {
     event.preventDefault(); const data = Object.fromEntries(new FormData(loginForm));
     const user = readUsers().find((item) => item.email === data.email.trim().toLowerCase() && item.password === data.password);
@@ -283,7 +295,7 @@ document.addEventListener('submit', async (event) => {
   if (!(form instanceof HTMLFormElement) || (!form.matches('[data-login-form]') && !form.matches('[data-signup-form]'))) return;
   event.preventDefault(); event.stopImmediatePropagation();
   const data = Object.fromEntries(new FormData(form));
-  const next = new URLSearchParams(location.search).get('next') || 'index.html';
+  const next = new URLSearchParams(location.search).get('next') || document.body.dataset.defaultNext || 'index.html';
   try {
     const client = await hhtSupabaseReady;
     if (form.matches('[data-signup-form]')) {
@@ -306,3 +318,37 @@ document.addEventListener('submit', async (event) => {
 }, true);
 
 syncCloudOrders();
+
+function escapePortalText(value) {
+  return String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
+}
+
+async function renderCustomerPortal() {
+  const container = document.querySelector('[data-portal-orders]');
+  if (!container) return;
+  const welcome = document.querySelector('[data-portal-welcome]');
+  try {
+    const client = await hhtSupabaseReady;
+    const { data: { user } } = await client.auth.getUser();
+    if (!user) { window.location.replace('login.html?next=portal.html'); return; }
+    const profile = await cloudProfile(client, user);
+    setCurrentUser(profile);
+    welcome.textContent = `Welcome back, ${profile.name.split(' ')[0]}. Here are your saved requests.`;
+    const { data, error } = await client.from('orders').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
+    if (error) throw error;
+    if (!data?.length) { container.innerHTML = '<p>You have no saved ride or package requests yet.</p>'; return; }
+    container.innerHTML = data.map((row) => {
+      const order = row.payload || {};
+      const label = row.service === 'package' ? 'Package delivery' : 'Ride request';
+      const destination = order.delivery || 'Destination unavailable';
+      const price = row.total == null ? 'Quote pending' : money(row.total);
+      return `<article class="portal-order"><div><h3>${label} <i class="status-pill">${escapePortalText(row.status)}</i></h3><p><strong>Order:</strong> ${escapePortalText(row.id)}</p><p><strong>From:</strong> ${escapePortalText(order.pickup)}</p><p><strong>To:</strong> ${escapePortalText(destination)}</p><p><strong>Requested:</strong> ${new Date(row.created_at).toLocaleDateString()}</p></div><strong class="portal-order-total">${price}</strong></article>`;
+    }).join('');
+  } catch (error) {
+    welcome.textContent = 'We could not load your account history.';
+    container.innerHTML = '<p>Please refresh the page or log in again.</p>';
+    console.warn(error);
+  }
+}
+
+renderCustomerPortal();
