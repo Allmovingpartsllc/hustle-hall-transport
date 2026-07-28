@@ -35,7 +35,7 @@ if (menuButton && mainNavigation) {
 
 const HHT_ORDERS = 'hht-orders';
 const PRICES = { small: 5, medium: 10, large: 20, extraLarge: 50 };
-const statuses = ['Requested', 'Accepted', 'Driver Assigned', 'Driver En Route', 'Picked Up', 'In Transit', 'Delivered', 'Completed'];
+const statuses = ['Requested', 'Accepted', 'Rejected', 'Cancelled', 'Driver Assigned', 'Driver En Route', 'Picked Up', 'In Transit', 'Delivered', 'Completed'];
 const readOrders = () => JSON.parse(localStorage.getItem(HHT_ORDERS) || '[]');
 const saveOrders = (orders) => localStorage.setItem(HHT_ORDERS, JSON.stringify(orders));
 const money = (value) => `$${Number(value || 0).toFixed(2)}`;
@@ -93,7 +93,7 @@ if (trackingForm) trackingForm.addEventListener('submit', (event) => { event.pre
 const receipt = document.querySelector('[data-receipt]');
 if (receipt) { const id = new URLSearchParams(location.search).get('id'); const order = readOrders().find(o => o.id === id); receipt.innerHTML = order ? `<p class="eyebrow">Hustle Hall Transport</p><h1>Digital receipt</h1><p class="receipt-id">${order.id}</p><p>Created ${order.createdAt}</p><hr>${orderDetails(order)}<hr>${order.service === 'package' ? `<div class="receipt-row"><span>${order.size} package</span><strong>${money(order.base)}</strong></div><div class="receipt-row"><span>Distance surcharge</span><strong>${money(order.surcharge)}</strong></div><div class="receipt-row"><span>Distance</span><strong>${order.miles} miles</strong></div><div class="receipt-row receipt-total"><span>Total</span><strong>${money(order.total)}</strong></div>` : `<div class="receipt-row"><span>Base fare</span><strong>${money(order.base)}</strong></div><div class="receipt-row"><span>Mileage (${order.miles} miles)</span><strong>${money(order.mileCharge)}</strong></div><div class="receipt-row"><span>Time (${order.minutes} minutes)</span><strong>${money(order.minuteCharge)}</strong></div><div class="receipt-row receipt-total"><span>Total</span><strong>${money(order.total)}</strong></div>`}<hr><p><strong>Hustle Hard. Deliver Smart.</strong><br>239-800-1380<br>Powered by ALLMOVINGPARTS LLC</p>` : '<h1>Receipt not found</h1><p>This receipt is not available in this browser.</p>'; }
 
-function renderAdmin() { const orders = readOrders(); const body = document.querySelector('[data-admin-orders]'); if (!body) return; const delivered = orders.filter(o => ['Delivered','Completed'].includes(o.status)); document.querySelector('[data-admin-stats]').innerHTML = `<article class="stat-card"><span>Total requests</span><strong>${orders.length}</strong></article><article class="stat-card"><span>Active requests</span><strong>${orders.filter(o => !['Delivered','Completed'].includes(o.status)).length}</strong></article><article class="stat-card"><span>Delivered revenue</span><strong>${money(delivered.reduce((sum,o) => sum + Number(o.total || 0), 0))}</strong></article>`; body.innerHTML = orders.length ? orders.map(o => `<tr><td><a href="receipt.html?id=${encodeURIComponent(o.id)}">${o.id}</a></td><td>${o.customerName}<br><small>${o.phone}</small></td><td>${o.service}</td><td>${o.total ? money(o.total) : 'TBD'}</td><td><select data-status="${o.id}">${statuses.map(s => `<option ${s === o.status ? 'selected' : ''}>${s}</option>`).join('')}</select></td><td><a href="receipt.html?id=${encodeURIComponent(o.id)}">Receipt</a></td></tr>`).join('') : '<tr><td colspan="6">No requests yet.</td></tr>'; body.querySelectorAll('[data-status]').forEach(el => el.addEventListener('change', () => { const list=readOrders(); const item=list.find(o=>o.id===el.dataset.status); item.status=el.value; saveOrders(list); renderAdmin(); })); }
+function renderAdmin() { const orders = readOrders(); const body = document.querySelector('[data-admin-orders]'); if (!body) return; const delivered = orders.filter(o => ['Delivered','Completed'].includes(o.status)); document.querySelector('[data-admin-stats]').innerHTML = `<article class="stat-card"><span>Total requests</span><strong>${orders.length}</strong></article><article class="stat-card"><span>Active requests</span><strong>${orders.filter(o => !['Delivered','Completed','Rejected','Cancelled'].includes(o.status)).length}</strong></article><article class="stat-card"><span>Delivered revenue</span><strong>${money(delivered.reduce((sum,o) => sum + Number(o.total || 0), 0))}</strong></article>`; body.innerHTML = orders.length ? orders.map(o => `<tr><td><a href="receipt.html?id=${encodeURIComponent(o.id)}">${o.id}</a></td><td>${o.customerName}<br><small>${o.phone}</small></td><td>${o.service}</td><td>${o.total ? money(o.total) : 'TBD'}</td><td><select data-status="${o.id}">${statuses.map(s => `<option ${s === o.status ? 'selected' : ''}>${s}</option>`).join('')}</select></td><td><a href="receipt.html?id=${encodeURIComponent(o.id)}">Receipt</a></td></tr>`).join('') : '<tr><td colspan="6">No requests yet.</td></tr>'; body.querySelectorAll('[data-status]').forEach(el => el.addEventListener('change', async () => { const nextStatus = el.value; const list=readOrders(); const item=list.find(o=>o.id===el.dataset.status); if (item) { item.status=nextStatus; saveOrders(list); } try { const client = await hhtSupabaseReady; const { error } = await client.from('orders').update({ status: nextStatus }).eq('id', el.dataset.status); if (error) throw error; } catch (error) { console.warn('Cloud status update unavailable.', error); } renderAdmin(); })); }
 renderAdmin();
 document.querySelector('[data-export]')?.addEventListener('click', () => { const orders = readOrders(); const keys = ['id','createdAt','service','customerName','phone','pickup','delivery','status','total']; const csv=[keys.join(','),...orders.map(o=>keys.map(k=>`"${String(o[k]??'').replaceAll('"','""')}"`).join(','))].join('\n'); const link=document.createElement('a'); link.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); link.download='hustle-hall-orders.csv'; link.click(); URL.revokeObjectURL(link.href); });
 
@@ -345,8 +345,26 @@ async function renderCustomerPortal() {
       const label = row.service === 'package' ? 'Package delivery' : 'Ride request';
       const destination = order.delivery || 'Destination unavailable';
       const price = row.total == null ? 'Quote pending' : money(row.total);
-      return `<article class="portal-order"><div><h3>${label} <i class="status-pill">${escapePortalText(row.status)}</i></h3><p><strong>Order:</strong> ${escapePortalText(row.id)}</p><p><strong>From:</strong> ${escapePortalText(order.pickup)}</p><p><strong>To:</strong> ${escapePortalText(destination)}</p><p><strong>Requested:</strong> ${new Date(row.created_at).toLocaleDateString()}</p></div><strong class="portal-order-total">${price}</strong></article>`;
+      const canCancel = ['Requested', 'Accepted'].includes(row.status);
+      return `<article class="portal-order"><div><h3>${label} <i class="status-pill">${escapePortalText(row.status)}</i></h3><p><strong>Order:</strong> ${escapePortalText(row.id)}</p><p><strong>From:</strong> ${escapePortalText(order.pickup)}</p><p><strong>To:</strong> ${escapePortalText(destination)}</p><p><strong>Requested:</strong> ${new Date(row.created_at).toLocaleDateString()}</p></div><div class="portal-order-actions"><strong class="portal-order-total">${price}</strong>${canCancel ? `<button class="button button-danger" type="button" data-cancel-order="${escapePortalText(row.id)}">Cancel request</button>` : ''}</div></article>`;
     }).join('');
+    container.querySelectorAll('[data-cancel-order]').forEach((button) => button.addEventListener('click', async () => {
+      const orderId = button.dataset.cancelOrder;
+      if (!window.confirm('Cancel this request?')) return;
+      button.disabled = true;
+      try {
+        const { error: cancelError } = await client.from('orders').update({ status: 'Cancelled' }).eq('id', orderId).eq('user_id', user.id);
+        if (cancelError) throw cancelError;
+        const localOrders = readOrders();
+        const localOrder = localOrders.find((savedOrder) => savedOrder.id === orderId);
+        if (localOrder) { localOrder.status = 'Cancelled'; saveOrders(localOrders); }
+        await renderCustomerPortal();
+      } catch (cancelError) {
+        button.disabled = false;
+        window.alert('We could not cancel this request. Please contact Hustle Hall Transport for assistance.');
+        console.warn('Cancellation unavailable.', cancelError);
+      }
+    }));
   } catch (error) {
     welcome.textContent = 'We could not load your account history.';
     container.innerHTML = '<p>Please refresh the page or log in again.</p>';
