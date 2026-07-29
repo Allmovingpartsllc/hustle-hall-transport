@@ -401,15 +401,31 @@ function addInstagramFooterLink() {
     document.body.append(footer);
   }
   const content = footer.querySelector('.footer-content') || footer;
-  if (content.querySelector('.footer-instagram')) return;
-  const link = document.createElement('a');
-  link.className = 'footer-instagram';
-  link.href = 'https://instagram.com/HustleHallTransport';
-  link.target = '_blank';
-  link.rel = 'noopener';
-  link.setAttribute('aria-label', 'Follow Hustle Hall Transport on Instagram');
-  link.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.3 2h9.4A5.3 5.3 0 0 1 22 7.3v9.4a5.3 5.3 0 0 1-5.3 5.3H7.3A5.3 5.3 0 0 1 2 16.7V7.3A5.3 5.3 0 0 1 7.3 2Zm-.2 2A3.1 3.1 0 0 0 4 7.1v9.8A3.1 3.1 0 0 0 7.1 20h9.8a3.1 3.1 0 0 0 3.1-3.1V7.1A3.1 3.1 0 0 0 16.9 4H7.1Zm9.1 1.5a1.3 1.3 0 1 1 0 2.6 1.3 1.3 0 0 1 0-2.6ZM12 6.5A5.5 5.5 0 1 1 6.5 12 5.5 5.5 0 0 1 12 6.5Zm0 2A3.5 3.5 0 1 0 15.5 12 3.5 3.5 0 0 0 12 8.5Z"/></svg><span>@HustleHallTransport</span>';
-  content.append(link);
+  if (content.querySelector('.footer-social')) return;
+  const socials = [
+    {
+      href: 'https://www.instagram.com/HustleHallTransport/',
+      label: 'Follow Hustle Hall Transport on Instagram',
+      className: 'footer-instagram',
+      content: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.3 2h9.4A5.3 5.3 0 0 1 22 7.3v9.4a5.3 5.3 0 0 1-5.3 5.3H7.3A5.3 5.3 0 0 1 2 16.7V7.3A5.3 5.3 0 0 1 7.3 2Zm-.2 2A3.1 3.1 0 0 0 4 7.1v9.8A3.1 3.1 0 0 0 7.1 20h9.8a3.1 3.1 0 0 0 3.1-3.1V7.1A3.1 3.1 0 0 0 16.9 4H7.1Zm9.1 1.5a1.3 1.3 0 1 1 0 2.6 1.3 1.3 0 0 1 0-2.6ZM12 6.5A5.5 5.5 0 1 1 6.5 12 5.5 0 0 1 12 6.5Zm0 2A3.5 3.5 0 1 0 15.5 12 3.5 3.5 0 0 0 12 8.5Z"/></svg><span>@HustleHallTransport</span>'
+    },
+    {
+      href: 'https://www.facebook.com/share/14rNvH3HnKH/?mibextid=wwXIfr',
+      label: 'Follow Hustle Hall Transport on Facebook',
+      className: 'footer-facebook',
+      content: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 21v-8h2.7l.4-3h-3.1V8.1c0-.9.3-1.5 1.6-1.5h1.7V3.9c-.3 0-1.3-.1-2.4-.1-2.4 0-4.1 1.5-4.1 4.2v2H7.5v3h2.8v8h3.2Z"/></svg><span>Hustle Hall Transport</span>'
+    }
+  ];
+  socials.forEach(({ href, label, className, content: socialContent }) => {
+    const link = document.createElement('a');
+    link.className = `footer-social ${className}`;
+    link.href = href;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.setAttribute('aria-label', label);
+    link.innerHTML = socialContent;
+    content.append(link);
+  });
 }
 
 addInstagramFooterLink();
