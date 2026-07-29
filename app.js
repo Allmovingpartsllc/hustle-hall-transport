@@ -55,7 +55,7 @@ function calculatePackage(form) {
   const base = PRICES[size];
   const miles = Number(form.elements.miles?.value || 0);
   const additionalMiles = Math.max(0, miles - 20);
-  const surcharge = miles > 20 ? 10 + (additionalMiles * 0.5) : 0;
+  const surcharge = miles > 20 ? 10 + (additionalMiles * 0.35) : 0;
   form.querySelector('[data-base-price]').textContent = money(base);
   form.querySelector('[data-surcharge]').textContent = money(surcharge);
   form.querySelector('[data-total]').textContent = money(base + surcharge);
@@ -88,6 +88,9 @@ function addSchedulingFields() {
     }
     if (!form.elements.dropoffTime) {
       grid.insertAdjacentHTML('beforeend', '<label>Preferred drop-off time<input name="dropoffTime" type="time" required></label>');
+    }
+    if (service === 'package' && !form.querySelector('.package-mileage-disclaimer')) {
+      form.querySelector('.quote-card')?.insertAdjacentHTML('beforeend', '<p class="package-mileage-disclaimer"><strong>Distance pricing disclaimer:</strong> Package delivery prices include the selected package rate. Deliveries over 20 miles include a $10 distance surcharge, plus $0.35 for each additional mile after the first 20 miles. Final pricing will be confirmed before pickup. Additional charges may apply for oversized, heavy, fragile, or special-handling items.</p>');
     }
   });
 }
