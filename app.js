@@ -107,6 +107,12 @@ if (receipt) { const id = new URLSearchParams(location.search).get('id'); const 
 
 function renderAdmin() { const orders = readOrders(); const body = document.querySelector('[data-admin-orders]'); if (!body) return; const delivered = orders.filter(o => ['Delivered','Completed'].includes(o.status)); document.querySelector('[data-admin-stats]').innerHTML = `<article class="stat-card"><span>Total requests</span><strong>${orders.length}</strong></article><article class="stat-card"><span>Active requests</span><strong>${orders.filter(o => !['Delivered','Completed','Rejected','Cancelled'].includes(o.status)).length}</strong></article><article class="stat-card"><span>Delivered revenue</span><strong>${money(delivered.reduce((sum,o) => sum + Number(o.total || 0), 0))}</strong></article>`; body.innerHTML = orders.length ? orders.map(o => `<tr><td><a href="receipt.html?id=${encodeURIComponent(o.id)}">${o.id}</a></td><td>${o.customerName}<br><small>${o.phone}</small></td><td>${o.service}</td><td>${o.total ? money(o.total) : 'TBD'}</td><td><select data-status="${o.id}">${statuses.map(s => `<option ${s === o.status ? 'selected' : ''}>${s}</option>`).join('')}</select></td><td><a href="receipt.html?id=${encodeURIComponent(o.id)}">Receipt</a></td></tr>`).join('') : '<tr><td colspan="6">No requests yet.</td></tr>'; body.querySelectorAll('[data-status]').forEach(el => el.addEventListener('change', async () => { const nextStatus = el.value; const list=readOrders(); const item=list.find(o=>o.id===el.dataset.status); if (item) { item.status=nextStatus; saveOrders(list); } try { const client = await hhtSupabaseReady; const { error } = await client.from('orders').update({ status: nextStatus }).eq('id', el.dataset.status); if (error) throw error; } catch (error) { console.warn('Cloud status update unavailable.', error); } renderAdmin(); })); }
 renderAdmin();
+if (document.querySelector('[data-admin-orders]')) {
+  const pushScript = document.createElement('script');
+  pushScript.src = 'push.js';
+  pushScript.defer = true;
+  document.head.append(pushScript);
+}
 document.addEventListener('change', (event) => {
   const statusControl = event.target;
   if (!(statusControl instanceof HTMLSelectElement) || !statusControl.matches('[data-status]')) return;
