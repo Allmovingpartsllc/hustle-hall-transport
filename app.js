@@ -54,11 +54,12 @@ function calculatePackage(form) {
   const size = form.elements.packageSize?.value || 'small';
   const base = PRICES[size];
   const miles = Number(form.elements.miles?.value || 0);
-  const surcharge = miles > 20 ? 10 : 0;
+  const additionalMiles = Math.max(0, miles - 20);
+  const surcharge = miles > 20 ? 10 + (additionalMiles * 0.5) : 0;
   form.querySelector('[data-base-price]').textContent = money(base);
   form.querySelector('[data-surcharge]').textContent = money(surcharge);
   form.querySelector('[data-total]').textContent = money(base + surcharge);
-  return { base, miles, surcharge, total: base + surcharge, size };
+  return { base, miles, additionalMiles, surcharge, total: base + surcharge, size };
 }
 
 function calculateRide(form) {
