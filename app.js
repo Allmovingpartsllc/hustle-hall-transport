@@ -76,6 +76,24 @@ function calculateRide(form) {
   return { base, miles, minutes, mileCharge, minuteCharge, surcharge: 0, total, shortTripBase: miles < 5 };
 }
 
+function addSchedulingFields() {
+  document.querySelectorAll('[data-booking-form]').forEach((form) => {
+    const service = form.dataset.service;
+    const detailsHeading = service === 'package' ? 'Pickup & delivery' : 'Trip details';
+    const detailsSection = Array.from(form.querySelectorAll('section')).find((section) => section.querySelector('h2')?.textContent.trim() === detailsHeading);
+    const grid = detailsSection?.querySelector('.form-grid');
+    if (!grid) return;
+    if (service === 'package' && !form.elements.date) {
+      grid.insertAdjacentHTML('beforeend', '<label>Pickup date<input name="date" type="date" required></label><label>Pickup time<input name="time" type="time" required></label>');
+    }
+    if (!form.elements.dropoffTime) {
+      grid.insertAdjacentHTML('beforeend', '<label>Preferred drop-off time<input name="dropoffTime" type="time" required></label>');
+    }
+  });
+}
+
+addSchedulingFields();
+
 document.querySelectorAll('[data-booking-form]').forEach((form) => {
   const calculator = form.dataset.service === 'package' ? calculatePackage : calculateRide;
   form.addEventListener('input', () => calculator(form));
