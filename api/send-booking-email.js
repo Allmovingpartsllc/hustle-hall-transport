@@ -23,6 +23,7 @@ function details(order) {
     ['Destination', order.delivery],
     ['Requested date', order.date || 'Not specified'],
     ['Requested time', order.time || 'Not specified'],
+    ['Preferred drop-off time', order.dropoffTime || 'Not specified'],
     ['Distance', order.miles ? `${order.miles} miles` : 'To be confirmed'],
     ['Estimated total', Number.isFinite(Number(order.total)) ? `$${Number(order.total).toFixed(2)}` : 'To be confirmed']
   ];
