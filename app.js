@@ -88,11 +88,13 @@ document.querySelectorAll('[data-booking-form]').forEach((form) => {
     try {
       const client = await hhtSupabaseReady;
       const { data: { user } } = await client.auth.getUser();
-      const { error: orderError } = await client.from('orders').upsert({ id: order.id, user_id: user?.id ?? null, service: order.service, status: order.status, total: order.total, payload: order });
+      const { error: orderError } = user
+        ? await client.from('orders').insert({ id: order.id, user_id: user.id, service: order.service, status: order.status, total: order.total, payload: order })
+        : await client.rpc('create_guest_order', { p_id: order.id, p_service: order.service, p_status: order.status, p_total: order.total, p_payload: order });
       if (orderError) throw orderError;
     } catch (error) {
       console.warn('Cloud booking save unavailable.', error);
-      window.alert('We could not save your request. Please check your connection and try again.');
+      window.alert(`We could not save your request. ${error.message || 'Please check your connection and try again.'}`);
       return;
     }
     try {
