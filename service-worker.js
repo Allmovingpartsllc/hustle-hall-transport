@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hustle-hall-v7';
+const CACHE_NAME = 'hustle-hall-v10';
 const APP_FILES = [
   './',
   './index.html',
@@ -6,6 +6,7 @@ const APP_FILES = [
   './app.js',
   './manifest.webmanifest',
   './logo.JPG',
+  './logo.png',
   './icon-192.png',
   './icon-512.png',
   './login.html',

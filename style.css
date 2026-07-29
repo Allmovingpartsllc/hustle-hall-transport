@@ -83,3 +83,35 @@ h1 span { color: var(--pink); }
 .booking-form .package-details-section { position: relative; overflow: hidden; border-color: #f2a2c8; background: linear-gradient(135deg, #fffafd, #fff2f7); }.package-details-section::after { content: "PACKAGE DETAILS"; position: absolute; top: 15px; right: -30px; color: rgba(232,45,124,.07); font: 800 1.2rem "Manrope",sans-serif; letter-spacing: .12em; transform: rotate(18deg); }.package-details-section h2 { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; }.package-details-section h2::before { content: ""; width: 7px; height: 27px; background: var(--pink); border-radius: 99px; }.package-details-section label { position: relative; z-index: 1; }.package-details-section select { border-color: #ef8bbc; background: var(--white); box-shadow: 0 4px 12px rgba(232,45,124,.08); }.package-details-section select:focus { outline: 3px solid rgba(232,45,124,.2); border-color: var(--pink); }.package-details-section .package-size-guide { position: relative; z-index: 1; gap: 8px; margin-top: 13px; padding: 15px; background: var(--white); border: 1px solid #f4bbd5; border-radius: 10px; box-shadow: 0 7px 18px rgba(56,20,39,.06); }.package-details-section .package-size-guide strong { color: var(--pink-dark); font-size: .84rem; letter-spacing: .04em; text-transform: uppercase; }.package-details-section .package-size-guide span { padding-left: 10px; border-left: 2px solid #f4bbd5; }.package-details-section .package-size-guide b { color: var(--ink); }
 
 .package-guide-card { padding: 26px 28px; background: var(--ink); color: var(--white); border-radius: 16px; box-shadow: var(--shadow); }.package-guide-card .eyebrow { color: #ff9bc4; }.package-guide-card h2 { margin-bottom: 20px; font-size: 1.5rem; }.package-guide-card > div { display: grid; grid-template-columns: repeat(2, 1fr); gap: 11px; }.package-guide-card span { padding: 13px; color: #e1d7dc; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); border-radius: 9px; font-size: .79rem; }.package-guide-card b { display: block; margin-bottom: 4px; color: #ff9bc4; font-size: .86rem; }@media (max-width: 600px) { .package-guide-card > div { grid-template-columns: 1fr; } }
+
+/* Hustle Hall Transport brand refresh */
+:root { --ink: #090609; --ink-soft: #655660; --pink: #ea2079; --pink-dark: #bb0e52; --rose: #fff1f7; --paper: #fffafd; --line: #efdce5; --shadow: 0 20px 55px rgba(26, 2, 14, .18); }
+body { background: var(--paper); }
+.site-header { background: rgba(9, 6, 9, .96); border-bottom-color: rgba(255,255,255,.12); }
+.brand { color: var(--white); gap: 12px; }
+.brand small { color: #ff77b0; }
+.brand-mark { width: 62px; height: 62px; color: transparent; background: #080608 url("logo.png") center / contain no-repeat; border: 1px solid #f44994; border-radius: 12px; box-shadow: 0 0 0 3px rgba(234,32,121,.13), 0 8px 22px rgba(234,32,121,.28); }
+.main-nav > a:not(.nav-call), .logout-button { color: #f7eaf0; }
+.main-nav > a:not(.nav-call):hover, .logout-button:hover { color: #ff71ae; }
+.nav-call { color: #fff; background: var(--pink); box-shadow: 0 7px 18px rgba(234,32,121,.26); }
+.menu-toggle span:not(.sr-only) { background: #fff; }
+.hero { position: relative; padding: 100px 0; color: var(--white); background: radial-gradient(circle at 86% 15%, rgba(234,32,121,.26), transparent 27%), linear-gradient(125deg, #070507, #160710 58%, #090609); }
+.hero::after { content: ""; position: absolute; inset: auto 0 0; height: 2px; background: linear-gradient(90deg, transparent, #f33186, transparent); }
+.hero h1 { text-shadow: 0 3px 20px rgba(234,32,121,.18); }
+.hero-text, .hero-note { color: #e9dbe1; }
+.hero-note a { color: #ff8dbd; }
+.button-primary { background: linear-gradient(135deg, #f3338a, #c80d5a); }
+.button-primary:hover { background: linear-gradient(135deg, #ff4d9d, #d91566); }
+.button-secondary { color: #fff; border-color: rgba(255,255,255,.74); }
+.button-secondary:hover { color: var(--ink); background: #fff; }
+.hero-panel { min-height: 395px; padding: 28px; background: #120911; border: 1px solid rgba(246,79,153,.38); box-shadow: 0 25px 65px rgba(0,0,0,.48), 0 0 30px rgba(234,32,121,.16); transform: rotate(1.5deg); }
+.hero-panel .route-card { display: flex; }.hero-panel .stat-grid { display: grid; }.hero-panel .motto { display: block; }
+.section-dark { background: linear-gradient(135deg, #080608, #1d0914); }
+.contact-card { background: linear-gradient(125deg, #e7136d, #a90546); box-shadow: 0 18px 40px rgba(173,5,70,.25); }
+.site-footer { color: #f5e5ec; background: #090609; border-top-color: rgba(255,255,255,.1); }
+.footer-content .brand { color: #fff; }
+.footer-social { color: #ff75b0; }
+.footer-social:hover { color: #fff; }
+.page-main { background: radial-gradient(circle at 90% 0, rgba(234,32,121,.12), transparent 30%), linear-gradient(125deg, #fff8fb, #fff); }
+.booking-form section, .result-card, .driver-card, .receipt, .auth-card, .portal-order, .contact-choice { box-shadow: 0 10px 30px rgba(55, 5, 29, .07); }
+@media (max-width: 760px) { .brand-mark { width: 54px; height: 54px; }.hero { padding: 64px 0; }.hero-panel { min-height: 315px; transform: none; }.brand > span:last-child { font-size: .94rem; } }
