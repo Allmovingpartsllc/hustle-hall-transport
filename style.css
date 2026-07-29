@@ -113,5 +113,6 @@ body { background: var(--paper); }
 .footer-social { color: #ff75b0; }
 .footer-social:hover { color: #fff; }
 .page-main { background: radial-gradient(circle at 90% 0, rgba(234,32,121,.12), transparent 30%), linear-gradient(125deg, #fff8fb, #fff); }
+.form-help { display: none; }
 .booking-form section, .result-card, .driver-card, .receipt, .auth-card, .portal-order, .contact-choice { box-shadow: 0 10px 30px rgba(55, 5, 29, .07); }
 @media (max-width: 760px) { .brand-mark { width: 54px; height: 54px; }.hero { padding: 64px 0; }.hero-panel { min-height: 315px; transform: none; }.brand > span:last-child { font-size: .94rem; } }
