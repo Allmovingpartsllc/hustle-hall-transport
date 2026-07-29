@@ -88,7 +88,8 @@ document.querySelectorAll('[data-booking-form]').forEach((form) => {
     try {
       const client = await hhtSupabaseReady;
       const { data: { user } } = await client.auth.getUser();
-      if (user) await client.from('orders').upsert({ id: order.id, user_id: user.id, service: order.service, status: order.status, total: order.total, payload: order });
+      const { error: orderError } = await client.from('orders').upsert({ id: order.id, user_id: user?.id ?? null, service: order.service, status: order.status, total: order.total, payload: order });
+      if (orderError) throw orderError;
     } catch (error) { console.warn('Cloud booking backup unavailable.', error); }
     try {
       await sendOrderNotification(order);
@@ -310,9 +311,12 @@ async function syncCloudOrders() {
     if (!user) return;
     const { data, error } = await client.from('orders').select('*').order('created_at', { ascending: false });
     if (error) throw error;
+    const dashboardNotice = document.querySelector('.dashboard-note');
+    if (dashboardNotice) dashboardNotice.textContent = 'View and manage all customer ride and delivery requests, including requests made without an account.';
     if (data?.length) {
       const orders = data.map((row) => ({ ...row.payload, id: row.id, status: row.status, total: Number(row.total), createdAt: new Date(row.created_at).toLocaleString() }));
       saveOrders(orders);
+      renderAdmin();
     }
   } catch (error) { console.warn('Cloud order sync unavailable.', error); }
 }
