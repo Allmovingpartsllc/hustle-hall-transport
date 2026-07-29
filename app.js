@@ -90,7 +90,11 @@ document.querySelectorAll('[data-booking-form]').forEach((form) => {
       const { data: { user } } = await client.auth.getUser();
       const { error: orderError } = await client.from('orders').upsert({ id: order.id, user_id: user?.id ?? null, service: order.service, status: order.status, total: order.total, payload: order });
       if (orderError) throw orderError;
-    } catch (error) { console.warn('Cloud booking backup unavailable.', error); }
+    } catch (error) {
+      console.warn('Cloud booking save unavailable.', error);
+      window.alert('We could not save your request. Please check your connection and try again.');
+      return;
+    }
     try {
       await sendOrderNotification(order);
     } catch (error) { console.warn('Email notification unavailable.', error); }
