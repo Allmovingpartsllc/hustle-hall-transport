@@ -138,6 +138,21 @@ function renderAdmin() { const orders = readOrders(); const body = document.quer
 renderAdmin();
 function openAdminOrderDetails(order) {
   const mapsLink = (address) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address || '')}`;
+  const formatCalendarTime = (date) => [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('') + 'T' + [String(date.getHours()).padStart(2, '0'), String(date.getMinutes()).padStart(2, '0'), '00'].join('');
+  const calendarLink = () => {
+    const title = `${order.service === 'package' ? 'Package delivery' : 'Ride'} — ${order.customerName || 'Customer'}`;
+    const details = [`Order: ${order.id}`, `Customer: ${order.customerName || 'Not provided'}`, `Phone: ${order.phone || 'Not provided'}`, `Pickup: ${order.pickup || 'Not provided'}`, `Delivery: ${order.delivery || 'Not provided'}`, `Status: ${order.status || 'Requested'}`].join('\n');
+    const params = new URLSearchParams({ action: 'TEMPLATE', text: title, details, location: order.pickup || order.delivery || '' });
+    if (order.date) {
+      const start = new Date(`${order.date}T${order.time || '09:00'}:00`);
+      if (!Number.isNaN(start.getTime())) {
+        const end = new Date(start.getTime() + (order.minutes ? Number(order.minutes) : 60) * 60000);
+        params.set('dates', `${formatCalendarTime(start)}/${formatCalendarTime(end)}`);
+        params.set('ctz', 'America/New_York');
+      }
+    }
+    return `https://calendar.google.com/calendar/render?${params.toString()}`;
+  };
   const fields = [
     ['Order number', order.id],
     ['Service', order.service === 'package' ? 'Package delivery' : 'Ride request'],
@@ -162,7 +177,7 @@ function openAdminOrderDetails(order) {
     const isAddress = label === 'Pickup address' || label === 'Delivery address';
     const content = isAddress && value ? `<a class="address-map-link" href="${mapsLink(value)}" target="_blank" rel="noopener noreferrer">${escapePortalText(value)}<small>Open in Google Maps ↗</small></a>` : escapePortalText(value);
     return `<div><span>${escapePortalText(label)}</span><strong>${content}</strong></div>`;
-  }).join('')}</div><div class="order-details-actions"><a class="button button-primary" href="receipt.html?id=${encodeURIComponent(order.id)}">Open receipt</a><button type="button" class="button button-secondary">Close</button></div>`;
+  }).join('')}</div><div class="order-details-actions"><a class="button button-primary" href="${calendarLink()}" target="_blank" rel="noopener noreferrer">Add to Google Calendar</a><a class="button button-secondary" href="receipt.html?id=${encodeURIComponent(order.id)}">Open receipt</a><button type="button" class="button button-secondary">Close</button></div>`;
   document.body.append(dialog);
   const close = () => dialog.close();
   dialog.querySelector('.order-details-close').addEventListener('click', close);
