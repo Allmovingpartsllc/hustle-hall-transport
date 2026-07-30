@@ -136,6 +136,44 @@ if (receipt) { const id = new URLSearchParams(location.search).get('id'); const 
 
 function renderAdmin() { const orders = readOrders(); const body = document.querySelector('[data-admin-orders]'); if (!body) return; const delivered = orders.filter(o => ['Delivered','Completed'].includes(o.status)); document.querySelector('[data-admin-stats]').innerHTML = `<article class="stat-card"><span>Total requests</span><strong>${orders.length}</strong></article><article class="stat-card"><span>Active requests</span><strong>${orders.filter(o => !['Delivered','Completed','Rejected','Cancelled'].includes(o.status)).length}</strong></article><article class="stat-card"><span>Delivered revenue</span><strong>${money(delivered.reduce((sum,o) => sum + Number(o.total || 0), 0))}</strong></article>`; body.innerHTML = orders.length ? orders.map(o => `<tr><td><a href="receipt.html?id=${encodeURIComponent(o.id)}">${o.id}</a></td><td>${o.customerName}<br><small>${o.phone}</small></td><td>${o.service}</td><td>${o.total ? money(o.total) : 'TBD'}</td><td><select data-status="${o.id}">${statuses.map(s => `<option ${s === o.status ? 'selected' : ''}>${s}</option>`).join('')}</select></td><td><a href="receipt.html?id=${encodeURIComponent(o.id)}">Receipt</a></td></tr>`).join('') : '<tr><td colspan="6">No requests yet.</td></tr>'; body.querySelectorAll('[data-status]').forEach(el => el.addEventListener('change', async () => { const nextStatus = el.value; const list=readOrders(); const item=list.find(o=>o.id===el.dataset.status); if (item) { item.status=nextStatus; saveOrders(list); } try { const client = await hhtSupabaseReady; const { error } = await client.from('orders').update({ status: nextStatus }).eq('id', el.dataset.status); if (error) throw error; } catch (error) { console.warn('Cloud status update unavailable.', error); } renderAdmin(); })); }
 renderAdmin();
+function openAdminOrderDetails(order) {
+  const fields = [
+    ['Order number', order.id],
+    ['Service', order.service === 'package' ? 'Package delivery' : 'Ride request'],
+    ['Status', order.status],
+    ['Customer', order.customerName],
+    ['Customer phone', order.phone],
+    ['Customer email', order.email || 'Not provided'],
+    ['Pickup address', order.pickup],
+    ['Delivery address', order.delivery],
+    ['Pickup date', order.date || 'Not specified'],
+    ['Pickup time', order.time || 'Not specified'],
+    ['Preferred drop-off time', order.dropoffTime || 'Not specified'],
+    ['Distance', order.miles ? `${order.miles} miles` : 'Not calculated'],
+    ['Estimated total', money(order.total)]
+  ];
+  if (order.service === 'package') fields.splice(8, 0, ['Recipient', order.recipient || 'Not provided'], ['Recipient phone', order.recipientPhone || 'Not provided'], ['Package size', order.size || order.packageSize || 'Not specified'], ['Package description', order.description || 'Not provided']);
+  if (order.service === 'ride') fields.splice(8, 0, ['Passengers', order.passengers || 'Not specified'], ['Travel time', order.minutes ? `${order.minutes} minutes` : 'Not calculated']);
+  if (order.instructions) fields.push(['Special instructions', order.instructions]);
+  const dialog = document.createElement('dialog');
+  dialog.className = 'order-details-dialog';
+  dialog.innerHTML = `<div class="order-details-header"><div><p class="eyebrow">Request details</p><h2>${escapePortalText(order.id)}</h2></div><button type="button" class="order-details-close" aria-label="Close details">&times;</button></div><div class="admin-detail-grid">${fields.map(([label, value]) => `<div><span>${escapePortalText(label)}</span><strong>${escapePortalText(value)}</strong></div>`).join('')}</div><div class="order-details-actions"><a class="button button-primary" href="receipt.html?id=${encodeURIComponent(order.id)}">Open receipt</a><button type="button" class="button button-secondary">Close</button></div>`;
+  document.body.append(dialog);
+  const close = () => dialog.close();
+  dialog.querySelector('.order-details-close').addEventListener('click', close);
+  dialog.querySelector('.button-secondary').addEventListener('click', close);
+  dialog.addEventListener('close', () => dialog.remove());
+  dialog.showModal();
+}
+
+document.addEventListener('click', (event) => {
+  const orderLink = event.target.closest('[data-admin-orders] td:first-child a');
+  if (!orderLink) return;
+  event.preventDefault();
+  const orderId = new URL(orderLink.href).searchParams.get('id');
+  const order = readOrders().find((savedOrder) => savedOrder.id === orderId);
+  if (order) openAdminOrderDetails(order);
+});
 if (document.querySelector('[data-admin-orders]')) {
   const pushScript = document.createElement('script');
   pushScript.src = 'push.js';
