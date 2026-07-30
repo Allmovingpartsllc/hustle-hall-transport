@@ -137,6 +137,7 @@ if (receipt) { const id = new URLSearchParams(location.search).get('id'); const 
 function renderAdmin() { const orders = readOrders(); const body = document.querySelector('[data-admin-orders]'); if (!body) return; const delivered = orders.filter(o => ['Delivered','Completed'].includes(o.status)); document.querySelector('[data-admin-stats]').innerHTML = `<article class="stat-card"><span>Total requests</span><strong>${orders.length}</strong></article><article class="stat-card"><span>Active requests</span><strong>${orders.filter(o => !['Delivered','Completed','Rejected','Cancelled'].includes(o.status)).length}</strong></article><article class="stat-card"><span>Delivered revenue</span><strong>${money(delivered.reduce((sum,o) => sum + Number(o.total || 0), 0))}</strong></article>`; body.innerHTML = orders.length ? orders.map(o => `<tr><td><a href="receipt.html?id=${encodeURIComponent(o.id)}">${o.id}</a></td><td>${o.customerName}<br><small>${o.phone}</small></td><td>${o.service}</td><td>${o.total ? money(o.total) : 'TBD'}</td><td><select data-status="${o.id}">${statuses.map(s => `<option ${s === o.status ? 'selected' : ''}>${s}</option>`).join('')}</select></td><td><a href="receipt.html?id=${encodeURIComponent(o.id)}">Receipt</a></td></tr>`).join('') : '<tr><td colspan="6">No requests yet.</td></tr>'; body.querySelectorAll('[data-status]').forEach(el => el.addEventListener('change', async () => { const nextStatus = el.value; const list=readOrders(); const item=list.find(o=>o.id===el.dataset.status); if (item) { item.status=nextStatus; saveOrders(list); } try { const client = await hhtSupabaseReady; const { error } = await client.from('orders').update({ status: nextStatus }).eq('id', el.dataset.status); if (error) throw error; } catch (error) { console.warn('Cloud status update unavailable.', error); } renderAdmin(); })); }
 renderAdmin();
 function openAdminOrderDetails(order) {
+  const mapsLink = (address) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address || '')}`;
   const fields = [
     ['Order number', order.id],
     ['Service', order.service === 'package' ? 'Package delivery' : 'Ride request'],
@@ -157,7 +158,11 @@ function openAdminOrderDetails(order) {
   if (order.instructions) fields.push(['Special instructions', order.instructions]);
   const dialog = document.createElement('dialog');
   dialog.className = 'order-details-dialog';
-  dialog.innerHTML = `<div class="order-details-header"><div><p class="eyebrow">Request details</p><h2>${escapePortalText(order.id)}</h2></div><button type="button" class="order-details-close" aria-label="Close details">&times;</button></div><div class="admin-detail-grid">${fields.map(([label, value]) => `<div><span>${escapePortalText(label)}</span><strong>${escapePortalText(value)}</strong></div>`).join('')}</div><div class="order-details-actions"><a class="button button-primary" href="receipt.html?id=${encodeURIComponent(order.id)}">Open receipt</a><button type="button" class="button button-secondary">Close</button></div>`;
+  dialog.innerHTML = `<div class="order-details-header"><div><p class="eyebrow">Request details</p><h2>${escapePortalText(order.id)}</h2></div><button type="button" class="order-details-close" aria-label="Close details">&times;</button></div><div class="admin-detail-grid">${fields.map(([label, value]) => {
+    const isAddress = label === 'Pickup address' || label === 'Delivery address';
+    const content = isAddress && value ? `<a class="address-map-link" href="${mapsLink(value)}" target="_blank" rel="noopener noreferrer">${escapePortalText(value)}<small>Open in Google Maps ↗</small></a>` : escapePortalText(value);
+    return `<div><span>${escapePortalText(label)}</span><strong>${content}</strong></div>`;
+  }).join('')}</div><div class="order-details-actions"><a class="button button-primary" href="receipt.html?id=${encodeURIComponent(order.id)}">Open receipt</a><button type="button" class="button button-secondary">Close</button></div>`;
   document.body.append(dialog);
   const close = () => dialog.close();
   dialog.querySelector('.order-details-close').addEventListener('click', close);
