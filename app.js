@@ -143,7 +143,28 @@ if (trackingForm) trackingForm.addEventListener('submit', (event) => { event.pre
 const receipt = document.querySelector('[data-receipt]');
 if (receipt) { const id = new URLSearchParams(location.search).get('id'); const order = readOrders().find(o => o.id === id); receipt.innerHTML = order ? `<p class="eyebrow">Hustle Hall Transport</p><h1>Digital receipt</h1><p class="receipt-id">${order.id}</p><p>Created ${order.createdAt}</p><hr>${orderDetails(order)}<hr>${order.service === 'package' ? `<div class="receipt-row"><span>${order.size} package</span><strong>${money(order.base)}</strong></div><div class="receipt-row"><span>Distance surcharge</span><strong>${money(order.surcharge)}</strong></div><div class="receipt-row"><span>Distance</span><strong>${order.miles} miles</strong></div><div class="receipt-row receipt-total"><span>Total</span><strong>${money(order.total)}</strong></div>` : `<div class="receipt-row"><span>Base fare</span><strong>${money(order.base)}</strong></div><div class="receipt-row"><span>Mileage (${order.miles} miles)</span><strong>${money(order.mileCharge)}</strong></div><div class="receipt-row"><span>Time (${order.minutes} minutes)</span><strong>${money(order.minuteCharge)}</strong></div><div class="receipt-row receipt-total"><span>Total</span><strong>${money(order.total)}</strong></div>`}<hr><p><strong>Hustle Hard. Deliver Smart.</strong><br>239-800-1380<br>Powered by ALLMOVINGPARTS LLC</p>` : '<h1>Receipt not found</h1><p>This receipt is not available in this browser.</p>'; }
 
-function renderAdmin() { const orders = readOrders(); const body = document.querySelector('[data-admin-orders]'); if (!body) return; const delivered = orders.filter(o => ['Delivered','Completed'].includes(o.status)); document.querySelector('[data-admin-stats]').innerHTML = `<article class="stat-card"><span>Total requests</span><strong>${orders.length}</strong></article><article class="stat-card"><span>Active requests</span><strong>${orders.filter(o => !['Delivered','Completed','Rejected','Cancelled'].includes(o.status)).length}</strong></article><article class="stat-card"><span>Delivered revenue</span><strong>${money(delivered.reduce((sum,o) => sum + Number(o.total || 0), 0))}</strong></article>`; body.innerHTML = orders.length ? orders.map(o => `<tr><td><a href="receipt.html?id=${encodeURIComponent(o.id)}">${o.id}</a></td><td>${o.customerName}<br><small>${o.phone}</small></td><td>${o.service}</td><td>${o.total ? money(o.total) : 'TBD'}</td><td><select data-status="${o.id}">${statuses.map(s => `<option ${s === o.status ? 'selected' : ''}>${s}</option>`).join('')}</select></td><td><a href="receipt.html?id=${encodeURIComponent(o.id)}">Receipt</a></td></tr>`).join('') : '<tr><td colspan="6">No requests yet.</td></tr>'; body.querySelectorAll('[data-status]').forEach(el => el.addEventListener('change', async () => { const nextStatus = el.value; const list=readOrders(); const item=list.find(o=>o.id===el.dataset.status); if (item) { item.status=nextStatus; saveOrders(list); } try { const client = await hhtSupabaseReady; const { error } = await client.from('orders').update({ status: nextStatus }).eq('id', el.dataset.status); if (error) throw error; } catch (error) { console.warn('Cloud status update unavailable.', error); } renderAdmin(); })); }
+function requestStatusNote(status) {
+  return new Promise((resolve) => {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'status-note-dialog';
+    dialog.innerHTML = `<form method="dialog"><div class="status-note-header"><p class="eyebrow">Status update</p><h2>${escapePortalText(status)} request</h2></div><div class="status-note-body"><label for="status-note-text">Why is this request being ${escapePortalText(status.toLowerCase())}?</label><textarea id="status-note-text" rows="4" required placeholder="Enter a note for the customer and your records"></textarea><p class="status-note-error" aria-live="polite"></p></div><div class="status-note-actions"><button type="button" class="button button-secondary" data-status-note-cancel>Cancel</button><button type="submit" class="button button-primary">Save note</button></div></form>`;
+    document.body.append(dialog);
+    const textarea = dialog.querySelector('#status-note-text');
+    const closeWith = (value) => { dialog.close(); resolve(value); };
+    dialog.querySelector('[data-status-note-cancel]').addEventListener('click', () => closeWith(null));
+    dialog.querySelector('form').addEventListener('submit', (event) => {
+      event.preventDefault();
+      const note = textarea.value.trim();
+      if (!note) { dialog.querySelector('.status-note-error').textContent = 'Please enter a note before saving.'; return; }
+      closeWith(note);
+    });
+    dialog.addEventListener('close', () => { dialog.remove(); });
+    dialog.showModal();
+    textarea.focus();
+  });
+}
+
+function renderAdmin() { const orders = readOrders(); const body = document.querySelector('[data-admin-orders]'); if (!body) return; const delivered = orders.filter(o => ['Delivered','Completed'].includes(o.status)); document.querySelector('[data-admin-stats]').innerHTML = `<article class="stat-card"><span>Total requests</span><strong>${orders.length}</strong></article><article class="stat-card"><span>Active requests</span><strong>${orders.filter(o => !['Delivered','Completed','Rejected','Cancelled'].includes(o.status)).length}</strong></article><article class="stat-card"><span>Delivered revenue</span><strong>${money(delivered.reduce((sum,o) => sum + Number(o.total || 0), 0))}</strong></article>`; body.innerHTML = orders.length ? orders.map(o => `<tr><td><a href="receipt.html?id=${encodeURIComponent(o.id)}">${o.id}</a></td><td>${o.customerName}<br><small>${o.phone}</small></td><td>${o.service}</td><td>${o.total ? money(o.total) : 'TBD'}</td><td><select data-status="${o.id}">${statuses.map(s => `<option ${s === o.status ? 'selected' : ''}>${s}</option>`).join('')}</select></td><td><a href="receipt.html?id=${encodeURIComponent(o.id)}">Receipt</a><small class="order-request-time">Received: ${escapePortalText(o.createdAt || 'Not available')}</small><small class="order-completed-time">Completed: ${escapePortalText(o.completedAt || 'Not completed')}</small></td></tr>`).join('') : '<tr><td colspan="6">No requests yet.</td></tr>'; body.querySelectorAll('[data-status]').forEach(el => el.addEventListener('change', async () => { const nextStatus = el.value; const list=readOrders(); const item=list.find(o=>o.id===el.dataset.status); const needsNote = ['Rejected', 'Cancelled'].includes(nextStatus); const note = needsNote ? await requestStatusNote(nextStatus) : ''; if (needsNote && !note) { el.value = item?.status || 'Requested'; return; } if (item) { item.status=nextStatus; if (needsNote) { item.cancellationNote = note; item.cancelledBy = 'Admin'; item.cancelledAt = new Date().toLocaleString(); } if (['Delivered', 'Completed'].includes(nextStatus) && !item.completedAt) item.completedAt = new Date().toLocaleString(); saveOrders(list); } try { const client = await hhtSupabaseReady; const { error } = await client.from('orders').update({ status: nextStatus, payload: item }).eq('id', el.dataset.status); if (error) throw error; } catch (error) { console.warn('Cloud status update unavailable.', error); } if (item) sendOrderNotification(item, 'status_update').catch((error) => console.warn('Status notification unavailable.', error)); renderAdmin(); })); }
 renderAdmin();
 function openAdminOrderDetails(order) {
   const mapsLink = (address) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address || '')}`;
@@ -169,7 +190,6 @@ function openAdminOrderDetails(order) {
     ['Customer', order.customerName],
     ['Customer phone', order.phone],
     ['Customer email', order.email || 'Not provided'],
-    ['Order received', order.createdAt || 'Not available'],
     ['Payment method', order.paymentMethod || 'Not selected'],
     ['Pickup address', order.pickup],
     ['Delivery address', order.delivery],
@@ -179,6 +199,7 @@ function openAdminOrderDetails(order) {
     ['Distance', order.miles ? `${order.miles} miles` : 'Not calculated'],
     ['Estimated total', money(order.total)]
   ];
+  if (order.cancellationNote) fields.splice(3, 0, ['Cancellation/rejection note', order.cancellationNote], ['Updated by', order.cancelledBy || 'Not specified'], ['Update time', order.cancelledAt || 'Not available']);
   if (order.service === 'package') fields.splice(8, 0, ['Recipient', order.recipient || 'Not provided'], ['Recipient phone', order.recipientPhone || 'Not provided'], ['Package size', order.size || order.packageSize || 'Not specified'], ['Package description', order.description || 'Not provided']);
   if (order.service === 'ride') fields.splice(8, 0, ['Passengers', order.passengers || 'Not specified'], ['Travel time', order.minutes ? `${order.minutes} minutes` : 'Not calculated']);
   if (order.instructions) fields.push(['Special instructions', order.instructions]);
@@ -211,14 +232,6 @@ if (document.querySelector('[data-admin-orders]')) {
   pushScript.defer = true;
   document.head.append(pushScript);
 }
-document.addEventListener('change', (event) => {
-  const statusControl = event.target;
-  if (!(statusControl instanceof HTMLSelectElement) || !statusControl.matches('[data-status]')) return;
-  const updatedOrder = readOrders().find((order) => order.id === statusControl.dataset.status);
-  if (updatedOrder) {
-    sendOrderNotification(updatedOrder, 'status_update').catch((error) => console.warn('Status notification unavailable.', error));
-  }
-});
 document.querySelector('[data-export]')?.addEventListener('click', () => { const orders = readOrders(); const keys = ['id','createdAt','service','customerName','phone','pickup','delivery','status','total']; const csv=[keys.join(','),...orders.map(o=>keys.map(k=>`"${String(o[k]??'').replaceAll('"','""')}"`).join(','))].join('\n'); const link=document.createElement('a'); link.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); link.download='hustle-hall-orders.csv'; link.click(); URL.revokeObjectURL(link.href); });
 
 const driverOrders = document.querySelector('[data-driver-orders]');
@@ -473,19 +486,23 @@ async function renderCustomerPortal() {
       const destination = order.delivery || 'Destination unavailable';
       const price = row.total == null ? 'Quote pending' : money(row.total);
       const canCancel = ['Requested', 'Accepted'].includes(row.status);
-      return `<article class="portal-order"><div><h3>${label} <i class="status-pill">${escapePortalText(row.status)}</i></h3><p><strong>Order:</strong> ${escapePortalText(row.id)}</p><p><strong>From:</strong> ${escapePortalText(order.pickup)}</p><p><strong>To:</strong> ${escapePortalText(destination)}</p><p><strong>Requested:</strong> ${new Date(row.created_at).toLocaleDateString()}</p></div><div class="portal-order-actions"><strong class="portal-order-total">${price}</strong>${canCancel ? `<button class="button button-danger" type="button" data-cancel-order="${escapePortalText(row.id)}">Cancel request</button>` : ''}</div></article>`;
+      return `<article class="portal-order"><div><h3>${label} <i class="status-pill">${escapePortalText(row.status)}</i></h3><p><strong>Order:</strong> ${escapePortalText(row.id)}</p><p><strong>From:</strong> ${escapePortalText(order.pickup)}</p><p><strong>To:</strong> ${escapePortalText(destination)}</p><p><strong>Requested:</strong> ${new Date(row.created_at).toLocaleDateString()}</p>${order.cancellationNote ? `<p class="order-note"><strong>Cancellation/rejection note:</strong> ${escapePortalText(order.cancellationNote)}</p>` : ''}</div><div class="portal-order-actions"><strong class="portal-order-total">${price}</strong>${canCancel ? `<button class="button button-danger" type="button" data-cancel-order="${escapePortalText(row.id)}">Cancel request</button>` : ''}</div></article>`;
     }).join('');
     container.querySelectorAll('[data-cancel-order]').forEach((button) => button.addEventListener('click', async () => {
       const orderId = button.dataset.cancelOrder;
+      const cancellationNote = window.prompt('Please enter the reason you are cancelling this request:')?.trim();
+      if (!cancellationNote) { window.alert('A cancellation note is required.'); return; }
       if (!window.confirm('Cancel this request?')) return;
       button.disabled = true;
       try {
-        const { error: cancelError } = await client.from('orders').update({ status: 'Cancelled' }).eq('id', orderId).eq('user_id', user.id);
+        const row = data.find((savedRow) => savedRow.id === orderId);
+        const updatedPayload = { ...(row?.payload || {}), status: 'Cancelled', cancellationNote, cancelledBy: 'Customer', cancelledAt: new Date().toLocaleString() };
+        const { error: cancelError } = await client.from('orders').update({ status: 'Cancelled', payload: updatedPayload }).eq('id', orderId).eq('user_id', user.id);
         if (cancelError) throw cancelError;
         const localOrders = readOrders();
         const localOrder = localOrders.find((savedOrder) => savedOrder.id === orderId);
-        if (localOrder) { localOrder.status = 'Cancelled'; saveOrders(localOrders); }
-        sendOrderNotification({ ...order, id: row.id, service: row.service, status: 'Cancelled', total: row.total }, 'customer_cancelled').catch((notificationError) => console.warn('Cancellation notification unavailable.', notificationError));
+        if (localOrder) { Object.assign(localOrder, updatedPayload); saveOrders(localOrders); }
+        sendOrderNotification({ ...updatedPayload, id: row.id, service: row.service, status: 'Cancelled', total: row.total }, 'customer_cancelled').catch((notificationError) => console.warn('Cancellation notification unavailable.', notificationError));
         await renderCustomerPortal();
       } catch (cancelError) {
         button.disabled = false;
