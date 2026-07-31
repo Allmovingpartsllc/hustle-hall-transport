@@ -120,3 +120,4 @@ body { background: var(--paper); }
 .booking-form section, .result-card, .driver-card, .receipt, .auth-card, .portal-order, .contact-choice { box-shadow: 0 10px 30px rgba(55, 5, 29, .07); }
 @media (max-width: 760px) { .brand-mark { width: 54px; height: 54px; }.hero { padding: 64px 0; }.hero-panel { min-height: 315px; transform: none; }.brand > span:last-child { font-size: .94rem; } }
 .address-map-link { color: var(--pink-dark); text-decoration: underline; text-underline-offset: 3px; }.address-map-link small { display: block; margin-top: 7px; color: var(--ink-soft); font-size: .75rem; font-weight: 700; text-decoration: none; }
+.payment-disclaimer { margin: 14px 0 0; padding: 12px 14px; color: #6b1641; background: #fff2f7; border-left: 4px solid var(--pink-dark); border-radius: 8px; }
