@@ -97,6 +97,15 @@ function addSchedulingFields() {
 
 addSchedulingFields();
 
+function addPaymentFields() {
+  document.querySelectorAll('[data-booking-form]').forEach((form) => {
+    if (form.elements.paymentMethod) return;
+    form.querySelector('.quote-card')?.insertAdjacentHTML('beforebegin', `<section class="payment-section"><h2>Payment</h2><div class="form-grid"><label>Payment method<select name="paymentMethod" required><option value="Stripe">Stripe (pay online)</option><option value="Pay in Person">Pay in Person</option></select></label></div><p class="payment-disclaimer"><strong>Payment notice:</strong> All payments are upfront.</p></section>`);
+  });
+}
+
+addPaymentFields();
+
 document.querySelectorAll('[data-booking-form]').forEach((form) => {
   const calculator = form.dataset.service === 'package' ? calculatePackage : calculateRide;
   form.addEventListener('input', () => calculator(form));
@@ -160,6 +169,8 @@ function openAdminOrderDetails(order) {
     ['Customer', order.customerName],
     ['Customer phone', order.phone],
     ['Customer email', order.email || 'Not provided'],
+    ['Order received', order.createdAt || 'Not available'],
+    ['Payment method', order.paymentMethod || 'Not selected'],
     ['Pickup address', order.pickup],
     ['Delivery address', order.delivery],
     ['Pickup date', order.date || 'Not specified'],
