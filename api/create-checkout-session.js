@@ -1,13 +1,19 @@
-const Stripe = require("stripe");
+const Stripe = require('stripe');
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-
-module.exports = async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({
-      error: "Method not allowed",
+module.exports = async (request, response) => {
+  if (request.method !== 'POST') {
+    return response.status(405).json({
+      error: 'Method not allowed.'
     });
   }
+
+  if (!process.env.STRIPE_SECRET_KEY) {
+    return response.status(500).json({
+      error: 'Stripe is not configured.'
+    });
+  }
+
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
   try {
     const {
@@ -16,64 +22,114 @@ module.exports = async function handler(req, res) {
       customerName,
       serviceType,
       bookingId,
-    } = req.body || {};
+      cancelUrl
+    } = request.body || {};
 
     const amountInDollars = Number(amount);
+    const amountInCents = Math.round(amountInDollars * 100);
 
     if (
       !Number.isFinite(amountInDollars) ||
-      amountInDollars < 0.5
+      amountInDollars < 0.5 ||
+      amountInDollars > 5000
     ) {
-      return res.status(400).json({
-        error: "A valid payment amount is required.",
+      return response.status(400).json({
+        error: 'A valid payment amount is required.'
       });
     }
 
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
+    const validEmail =
+      typeof customerEmail === 'string' &&
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail);
 
-      customer_email: customerEmail || undefined,
+    const safeServiceType =
+      typeof serviceType === 'string' && serviceType.trim()
+        ? serviceType.trim().slice(0, 100)
+        : 'Transportation Booking';
+
+    const safeBookingId =
+      typeof bookingId === 'string'
+        ? bookingId.slice(0, 100)
+        : '';
+
+    const safeCustomerName =
+      typeof customerName === 'string'
+        ? customerName.slice(0, 100)
+        : '';
+
+    const allowedCancelPages = [
+      '/ride-booking.html',
+      '/package-booking.html'
+    ];
+
+    const cancelPage = allowedCancelPages.includes(cancelUrl)
+      ? cancelUrl
+      : '/ride-booking.html';
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+
+      customer_email: validEmail
+        ? customerEmail
+        : undefined,
+
+      payment_method_types: ['card'],
 
       line_items: [
         {
           price_data: {
-            currency: "usd",
+            currency: 'usd',
 
             product_data: {
-              name: serviceType
-                ? `Hustle Hall Transport — ${serviceType}`
-                : "Hustle Hall Transport Booking",
+              name: `Hustle Hall Transport — ${safeServiceType}`,
+
+              description: safeBookingId
+                ? `Booking number: ${safeBookingId}`
+                : undefined
             },
 
-            unit_amount: Math.round(amountInDollars * 100),
+            unit_amount: amountInCents
           },
 
-          quantity: 1,
-        },
+          quantity: 1
+        }
       ],
 
       metadata: {
-        bookingId: bookingId || "",
-        customerName: customerName || "",
-        serviceType: serviceType || "",
+        bookingId: safeBookingId,
+        customerName: safeCustomerName,
+        serviceType: safeServiceType
+      },
+
+      payment_intent_data: {
+        metadata: {
+          bookingId: safeBookingId,
+          customerName: safeCustomerName,
+          serviceType: safeServiceType
+        }
       },
 
       success_url:
-        "https://hustlehall.allmovingparts.com/receipt.html?payment=success&session_id={CHECKOUT_SESSION_ID}",
+        'https://hustlehall.allmovingparts.com/receipt.html' +
+        '?payment=success' +
+        '&session_id={CHECKOUT_SESSION_ID}',
 
       cancel_url:
-        "https://hustlehall.allmovingparts.com/ride-booking.html?payment=cancelled",
+        `https://hustlehall.allmovingparts.com${cancelPage}` +
+        '?payment=cancelled'
     });
 
-    return res.status(200).json({
+    return response.status(200).json({
       url: session.url,
-      sessionId: session.id,
+      sessionId: session.id
     });
   } catch (error) {
-    console.error("Stripe Checkout error:", error);
+    console.error('Stripe Checkout error:', error);
 
-    return res.status(500).json({
-      error: "Unable to start Stripe Checkout.",
+    return response.status(500).json({
+      error:
+        error?.message ||
+        'Unable to start Stripe Checkout.'
     });
   }
 };
