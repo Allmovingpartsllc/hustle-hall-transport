@@ -50,6 +50,17 @@ async function sendOrderNotification(order, event = 'booking') {
   if (!response.ok) throw new Error('Email notification could not be sent.');
 }
 
+async function startStripeCheckout(order) {
+  const response = await fetch('/api/create-checkout-session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ order })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.url) throw new Error(data.error || 'Stripe Checkout could not be started.');
+  window.location.assign(data.url);
+}
+
 function calculatePackage(form) {
   const size = form.elements.packageSize?.value || 'small';
   const base = PRICES[size];
@@ -64,7 +75,7 @@ function calculatePackage(form) {
 
 function calculateRide(form) {
   const miles = Number(form.elements.miles?.value || 0);
-  const base = miles < 5 ? 5 : 1.5;
+  const base = miles <= 5 ? 5 : 4.25;
   const minutes = Number(form.elements.minutes?.value || 0);
   const mileCharge = miles * 0.25;
   const minuteCharge = minutes * 0.1;
@@ -73,7 +84,7 @@ function calculateRide(form) {
   form.querySelector('[data-mile-charge]').textContent = money(mileCharge);
   form.querySelector('[data-minute-charge]').textContent = money(minuteCharge);
   form.querySelector('[data-ride-total]').textContent = money(total);
-  return { base, miles, minutes, mileCharge, minuteCharge, surcharge: 0, total, shortTripBase: miles < 5 };
+  return { base, miles, minutes, mileCharge, minuteCharge, surcharge: 0, total, shortTripBase: miles <= 5 };
 }
 
 function addSchedulingFields() {
@@ -97,6 +108,8 @@ function addSchedulingFields() {
 
 addSchedulingFields();
 
+document.querySelector('[data-service="ride"] .quote-card p:last-child')?.replaceChildren('5 miles or less: $5 base fare. More than 5 miles: $4.25 base fare. Plus $0.25 per mile and $0.10 per minute.');
+
 function addPaymentFields() {
   document.querySelectorAll('[data-booking-form]').forEach((form) => {
     if (form.elements.paymentMethod) return;
@@ -114,7 +127,7 @@ document.querySelectorAll('[data-booking-form]').forEach((form) => {
     event.preventDefault();
     const fields = Object.fromEntries(new FormData(form));
     const quote = calculator(form);
-    const order = { id: makeId(), service: form.dataset.service, status: 'Requested', createdAt: new Date().toLocaleString(), accountId: currentUser()?.id || null, ...fields, ...quote };
+    const order = { id: makeId(), service: form.dataset.service, status: 'Requested', createdAt: new Date().toLocaleString(), accountId: currentUser()?.id || null, ...fields, ...quote, paymentStatus: fields.paymentMethod === 'Stripe' ? 'Awaiting payment' : 'Pay in Person' };
     const orders = readOrders(); orders.unshift(order); saveOrders(orders);
     try {
       const client = await hhtSupabaseReady;
@@ -131,6 +144,16 @@ document.querySelectorAll('[data-booking-form]').forEach((form) => {
     try {
       await sendOrderNotification(order);
     } catch (error) { console.warn('Email notification unavailable.', error); }
+    if (order.paymentMethod === 'Stripe') {
+      try {
+        await startStripeCheckout(order);
+        return;
+      } catch (error) {
+        console.warn('Stripe Checkout unavailable.', error);
+        window.alert(`Your request was saved, but payment could not be started. ${error.message}`);
+        return;
+      }
+    }
     window.location.href = `receipt.html?id=${encodeURIComponent(order.id)}`;
   });
 });
@@ -191,6 +214,7 @@ function openAdminOrderDetails(order) {
     ['Customer phone', order.phone],
     ['Customer email', order.email || 'Not provided'],
     ['Payment method', order.paymentMethod || 'Not selected'],
+    ['Payment status', order.paymentStatus || 'Not paid'],
     ['Pickup address', order.pickup],
     ['Delivery address', order.delivery],
     ['Pickup date', order.date || 'Not specified'],
