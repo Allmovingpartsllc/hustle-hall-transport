@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>AllMovingParts Operations</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="operations.css">
+  <script src="app.js" defer></script>
+  <script src="operations.js" defer></script>
+</head>
+<body class="ops-body">
+  <header class="site-header">
+    <div class="container nav-wrap">
+      <a class="brand" href="index.html"><span class="brand-mark">AMP</span><span>AllMovingParts <small>Operations</small></span></a>
+      <nav class="main-nav page-nav"><a href="admin.html">HustleHall Admin</a><a href="index.html">Home</a></nav>
+    </div>
+  </header>
+  <main class="page-main">
+    <div class="container ops-shell">
+      <div class="ops-heading">
+        <div><p class="eyebrow">Combined business dashboard</p><h1 class="page-title">Bookings, progress & profit.</h1><p>HustleHall and BuildIt requests appear here automatically.</p></div>
+        <div class="ops-actions"><button class="button button-secondary" data-refresh>Refresh</button><button class="button button-secondary" data-export-ops>Export CSV</button></div>
+      </div>
+      <p class="ops-message" data-ops-message>Connecting to the secure booking database…</p>
+      <section class="ops-stats" data-ops-stats aria-label="Business totals"></section>
+      <section class="ops-filters" aria-label="Filters">
+        <label>Business<select data-filter-source><option value="">Both businesses</option><option value="HustleHall">HustleHall</option><option value="BuildIt">BuildIt</option></select></label>
+        <label>Status<select data-filter-status><option value="">Every status</option></select></label>
+        <label>Search<input type="search" data-filter-search placeholder="Customer, booking ID, service…"></label>
+      </section>
+      <div class="ops-table-wrap">
+        <table class="ops-table">
+          <thead><tr><th>Booking</th><th>Customer / job</th><th>Schedule</th><th>Progress</th><th>Money</th><th>Next action</th><th>Updated</th></tr></thead>
+          <tbody data-ops-rows></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</body>
+</html>
