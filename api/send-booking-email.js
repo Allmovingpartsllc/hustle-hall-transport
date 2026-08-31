@@ -28,6 +28,7 @@ function details(order) {
     ['Estimated total', Number.isFinite(Number(order.total)) ? `$${Number(order.total).toFixed(2)}` : 'To be confirmed']
   ];
   if (order.service === 'package') rows.splice(8, 0, ['Package', order.size || order.packageSize || 'Not specified']);
+  if (order.deliveryProof?.deliveredAt) rows.push(['Delivered at', order.deliveryProof.deliveredAt], ['Received by', order.deliveryProof.signedBy || 'Not recorded']);
   return rows.map(([label, value]) => `<tr><td style="padding:8px 12px;border:1px solid #eee;font-weight:700">${escapeHtml(label)}</td><td style="padding:8px 12px;border:1px solid #eee">${escapeHtml(value)}</td></tr>`).join('');
 }
 
@@ -160,3 +161,4 @@ module.exports = async (request, response) => {
     return response.status(502).json({ error: 'Email could not be sent.' });
   }
 };
+
