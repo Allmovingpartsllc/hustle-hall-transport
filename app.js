@@ -457,8 +457,10 @@ function initializeAuthPage() {
   });
 }
 
-if (location.pathname.toLowerCase().endsWith('/admin.html') && currentUser()?.role !== 'admin') {
-  window.location.replace('auth.html?next=admin.html');
+const adminOnlyPage = location.pathname.toLowerCase().endsWith('/admin.html');
+const driverOnlyPage = location.pathname.toLowerCase().endsWith('/driver.html');
+if ((adminOnlyPage || driverOnlyPage) && currentUser()?.role !== 'admin') {
+  window.location.replace(`auth.html?next=${driverOnlyPage ? 'driver.html' : 'admin.html'}`);
 } else {
   accountNavigation(); initializeAuthPage();
 }
