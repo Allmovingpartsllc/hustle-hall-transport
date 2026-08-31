@@ -193,7 +193,7 @@ function openAdminOrderDetails(order) {
   const mapsLink = (address) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address || '')}`;
   const formatCalendarTime = (date) => [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('') + 'T' + [String(date.getHours()).padStart(2, '0'), String(date.getMinutes()).padStart(2, '0'), '00'].join('');
   const calendarLink = () => {
-    const title = `${order.service === 'package' ? 'Package delivery' : 'Ride'} — ${order.customerName || 'Customer'}`;
+    const title = `${order.service === 'package' ? 'Package delivery' : 'Ride'} - ${order.customerName || 'Customer'}`;
     const details = [`Order: ${order.id}`, `Customer: ${order.customerName || 'Not provided'}`, `Phone: ${order.phone || 'Not provided'}`, `Pickup: ${order.pickup || 'Not provided'}`, `Delivery: ${order.delivery || 'Not provided'}`, `Status: ${order.status || 'Requested'}`].join('\n');
     const params = new URLSearchParams({ action: 'TEMPLATE', text: title, details, location: order.pickup || order.delivery || '' });
     if (order.date) {
@@ -227,13 +227,15 @@ function openAdminOrderDetails(order) {
   if (order.service === 'package') fields.splice(8, 0, ['Recipient', order.recipient || 'Not provided'], ['Recipient phone', order.recipientPhone || 'Not provided'], ['Package size', order.size || order.packageSize || 'Not specified'], ['Package description', order.description || 'Not provided']);
   if (order.service === 'ride') fields.splice(8, 0, ['Passengers', order.passengers || 'Not specified'], ['Travel time', order.minutes ? `${order.minutes} minutes` : 'Not calculated']);
   if (order.instructions) fields.push(['Special instructions', order.instructions]);
+  if (order.deliveryProof?.deliveredAt) fields.push(['Delivered at', order.deliveryProof.deliveredAt], ['Received by', order.deliveryProof.signedBy || 'Not recorded']);
+  if (order.deliveryProof?.notes) fields.push(['Delivery notes', order.deliveryProof.notes]);
   const dialog = document.createElement('dialog');
   dialog.className = 'order-details-dialog';
   dialog.innerHTML = `<div class="order-details-header"><div><p class="eyebrow">Request details</p><h2>${escapePortalText(order.id)}</h2></div><button type="button" class="order-details-close" aria-label="Close details">&times;</button></div><div class="admin-detail-grid">${fields.map(([label, value]) => {
     const isAddress = label === 'Pickup address' || label === 'Delivery address';
-    const content = isAddress && value ? `<a class="address-map-link" href="${mapsLink(value)}" target="_blank" rel="noopener noreferrer">${escapePortalText(value)}<small>Open in Google Maps ↗</small></a>` : escapePortalText(value);
+    const content = isAddress && value ? `<a class="address-map-link" href="${mapsLink(value)}" target="_blank" rel="noopener noreferrer">${escapePortalText(value)}<small>Open in Google Maps ?</small></a>` : escapePortalText(value);
     return `<div><span>${escapePortalText(label)}</span><strong>${content}</strong></div>`;
-  }).join('')}</div><div class="order-details-actions"><a class="button button-primary" href="${calendarLink()}" target="_blank" rel="noopener noreferrer">Add to Google Calendar</a><a class="button button-secondary" href="receipt.html?id=${encodeURIComponent(order.id)}">Open receipt</a><button type="button" class="button button-secondary">Close</button></div>`;
+  }).join('')}</div>${order.deliveryProof ? `<section class="delivery-proof"><h3>Proof of delivery</h3><p><strong>Signed by:</strong> ${escapePortalText(order.deliveryProof.signedBy || 'Not recorded')}</p>${order.deliveryProof.photo ? `<img src="${order.deliveryProof.photo}" alt="Delivery proof photo for ${escapePortalText(order.id)}">` : ''}${order.deliveryProof.signature ? `<img class="delivery-signature" src="${order.deliveryProof.signature}" alt="Customer signature">` : ''}</section>` : ''}<div class="order-details-actions"><a class="button button-primary" href="${calendarLink()}" target="_blank" rel="noopener noreferrer">Add to Google Calendar</a><a class="button button-secondary" href="receipt.html?id=${encodeURIComponent(order.id)}">Open receipt</a><button type="button" class="button button-secondary">Close</button></div>`;
   document.body.append(dialog);
   const close = () => dialog.close();
   dialog.querySelector('.order-details-close').addEventListener('click', close);
@@ -259,7 +261,36 @@ if (document.querySelector('[data-admin-orders]')) {
 document.querySelector('[data-export]')?.addEventListener('click', () => { const orders = readOrders(); const keys = ['id','createdAt','service','customerName','phone','pickup','delivery','status','total']; const csv=[keys.join(','),...orders.map(o=>keys.map(k=>`"${String(o[k]??'').replaceAll('"','""')}"`).join(','))].join('\n'); const link=document.createElement('a'); link.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); link.download='hustle-hall-orders.csv'; link.click(); URL.revokeObjectURL(link.href); });
 
 const driverOrders = document.querySelector('[data-driver-orders]');
-if (driverOrders) { const orders = readOrders(); driverOrders.innerHTML = orders.length ? orders.map(o => `<article class="driver-card"><div><h2>${o.id} <i class="status-pill">${o.status}</i></h2><p><strong>Pickup:</strong> ${o.pickup}</p><p><strong>Delivery:</strong> ${o.delivery}</p><p><strong>Customer:</strong> ${o.customerName} · ${o.phone}</p></div><div><a class="button button-secondary" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(o.pickup)}&destination=${encodeURIComponent(o.delivery)}">Navigate</a></div></article>`).join('') : '<p>No requests available in this browser yet.</p>'; }
+async function saveDriverOrder(order) {
+  const orders = readOrders(); const index = orders.findIndex((item) => item.id === order.id);
+  if (index >= 0) orders[index] = order; saveOrders(orders);
+  try { const client = await hhtSupabaseReady; const { error } = await client.from('orders').update({ status: order.status, payload: order }).eq('id', order.id); if (error) throw error; } catch (error) { console.warn('Cloud driver update unavailable.', error); }
+  sendOrderNotification(order, 'status_update').catch((error) => console.warn('Customer update unavailable.', error));
+}
+function drawSignature(canvas) {
+  const context = canvas.getContext('2d'); context.lineWidth = 2.2; context.lineCap = 'round'; context.strokeStyle = '#150810'; let drawing = false; let signed = false;
+  const point = (event) => { const rect = canvas.getBoundingClientRect(); return { x: (event.clientX - rect.left) * (canvas.width / rect.width), y: (event.clientY - rect.top) * (canvas.height / rect.height) }; };
+  canvas.addEventListener('pointerdown', (event) => { drawing = true; signed = true; canvas.setPointerCapture(event.pointerId); const p = point(event); context.beginPath(); context.moveTo(p.x, p.y); });
+  canvas.addEventListener('pointermove', (event) => { if (!drawing) return; const p = point(event); context.lineTo(p.x, p.y); context.stroke(); }); canvas.addEventListener('pointerup', () => { drawing = false; });
+  return { clear: () => { context.clearRect(0, 0, canvas.width, canvas.height); signed = false; }, has: () => signed, data: () => canvas.toDataURL('image/png') };
+}
+function resizeProofPhoto(file) {
+  return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onerror = () => reject(new Error('The delivery photo could not be read.')); reader.onload = () => { const image = new Image(); image.onload = () => { const scale = Math.min(1, 1000 / Math.max(image.width, image.height)); const canvas = document.createElement('canvas'); canvas.width = Math.round(image.width * scale); canvas.height = Math.round(image.height * scale); canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height); resolve(canvas.toDataURL('image/jpeg', .78)); }; image.onerror = () => reject(new Error('The delivery photo could not be prepared.')); image.src = reader.result; }; reader.readAsDataURL(file); });
+}
+function openDeliveryProof(order) {
+  const dialog = document.createElement('dialog'); dialog.className = 'delivery-proof-dialog';
+  dialog.innerHTML = `<form method="dialog"><div class="status-note-header"><p class="eyebrow">Complete delivery</p><h2>${escapePortalText(order.id)}</h2></div><div class="status-note-body"><label>Proof photo<input name="proofPhoto" type="file" accept="image/*" capture="environment" required></label><label>Received by<input name="signedBy" required placeholder="Recipient full name"></label><label>Customer signature<canvas class="signature-pad" width="640" height="180" aria-label="Signature area"></canvas><button class="clear-signature" type="button">Clear signature</button></label><label>Delivery notes (optional)<textarea name="deliveryNotes" rows="3" placeholder="Where the item was left or any delivery details"></textarea></label><p class="status-note-error" aria-live="polite"></p></div><div class="status-note-actions"><button type="button" class="button button-secondary" data-close-proof>Cancel</button><button type="submit" class="button button-primary">Save proof &amp; mark delivered</button></div></form>`;
+  document.body.append(dialog); const signature = drawSignature(dialog.querySelector('.signature-pad')); const close = () => dialog.close(); dialog.querySelector('[data-close-proof]').addEventListener('click', close); dialog.querySelector('.clear-signature').addEventListener('click', signature.clear);
+  dialog.querySelector('form').addEventListener('submit', async (event) => { event.preventDefault(); const form = event.currentTarget; const error = dialog.querySelector('.status-note-error'); const photo = form.elements.proofPhoto.files[0]; if (!photo || !signature.has()) { error.textContent = 'Add a delivery photo and the recipient signature before completing this order.'; return; } const submit = form.querySelector('[type="submit"]'); submit.disabled = true; submit.textContent = 'Saving proof.'; try { order.status = 'Delivered'; order.completedAt = new Date().toLocaleString(); order.deliveryProof = { photo: await resizeProofPhoto(photo), signedBy: form.elements.signedBy.value.trim(), signature: signature.data(), notes: form.elements.deliveryNotes.value.trim(), deliveredAt: order.completedAt }; await saveDriverOrder(order); close(); renderDriverOrders(); } catch (saveError) { error.textContent = saveError.message || 'We could not save the delivery proof.'; submit.disabled = false; submit.textContent = 'Save proof & mark delivered'; } });
+  dialog.addEventListener('close', () => dialog.remove()); dialog.showModal();
+}
+function renderDriverOrders() {
+  if (!driverOrders) return; const orders = readOrders().filter((order) => !['Cancelled', 'Rejected', 'Completed'].includes(order.status));
+  driverOrders.innerHTML = orders.length ? orders.map((order) => { const text = encodeURIComponent(`Hustle Hall Transport update: Your ${order.service === 'package' ? 'delivery' : 'ride'} request ${order.id} is currently ${order.status}.`); return `<article class="driver-card"><div><h2>${escapePortalText(order.id)} <i class="status-pill">${escapePortalText(order.status)}</i></h2><p><strong>Pickup:</strong> ${escapePortalText(order.pickup)}</p><p><strong>Delivery:</strong> ${escapePortalText(order.delivery)}</p><p><strong>Customer:</strong> ${escapePortalText(order.customerName)} � ${escapePortalText(order.phone)}</p></div><div class="driver-actions"><a class="button button-secondary" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(order.pickup)}&destination=${encodeURIComponent(order.delivery)}">Navigate</a><a class="button button-secondary" href="sms:${String(order.phone || '').replace(/\D/g, '')}?body=${text}">Text customer</a><button class="button button-secondary" type="button" data-driver-status="${escapePortalText(order.id)}" data-next-status="Picked Up">Mark picked up</button><button class="button button-primary" type="button" data-complete-delivery="${escapePortalText(order.id)}">Complete delivery</button></div></article>`; }).join('') : '<p>No active requests are available in this browser yet.</p>';
+  driverOrders.querySelectorAll('[data-driver-status]').forEach((button) => button.addEventListener('click', async () => { const order = readOrders().find((item) => item.id === button.dataset.driverStatus); if (!order) return; order.status = button.dataset.nextStatus; await saveDriverOrder(order); renderDriverOrders(); }));
+  driverOrders.querySelectorAll('[data-complete-delivery]').forEach((button) => button.addEventListener('click', () => { const order = readOrders().find((item) => item.id === button.dataset.completeDelivery); if (order) openDeliveryProof(order); }));
+}
+renderDriverOrders();
 // OpenStreetMap address suggestions and OSRM driving-route estimates for the local MVP.
 let lastGeocodeRequest = 0;
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -294,7 +325,7 @@ async function calculateRoute(form) {
   const status = form.querySelector('[data-route-status]');
   if (!origin.value.trim() || !destination.value.trim()) { status.textContent = 'Enter both addresses first.'; return; }
   try {
-    status.textContent = 'Finding the best driving route…';
+    status.textContent = 'Finding the best driving route.';
     for (const input of [origin, destination]) {
       if (!input.dataset.lat) {
         const [place] = await geocodeAddress(input.value);
@@ -312,7 +343,7 @@ async function calculateRoute(form) {
     form.elements.miles.value = (route.distance / 1609.344).toFixed(1);
     if (form.elements.minutes) form.elements.minutes.value = Math.max(1, Math.round(route.duration / 60));
     (form.dataset.service === 'package' ? calculatePackage : calculateRide)(form);
-    status.textContent = `${form.elements.miles.value} miles${form.elements.minutes ? ` · ${form.elements.minutes.value} minutes` : ''} estimated`;
+    status.textContent = `${form.elements.miles.value} miles${form.elements.minutes ? ` � ${form.elements.minutes.value} minutes` : ''} estimated`;
     drawRoute(form, origin, destination, route.geometry.coordinates);
   } catch (error) { status.textContent = error.message || 'Route calculation is currently unavailable.'; }
 }
@@ -421,7 +452,7 @@ function initializeAuthPage() {
     const role = data.adminCode === HHT_ADMIN_ACCESS_CODE ? 'admin' : 'customer';
     const user = { id: `HHTU-${Date.now()}`, name: data.name.trim(), email, password: data.password, role };
     saveUsers([...readUsers(), user]); setCurrentUser({ id: user.id, name: user.name, email: user.email, role: user.role });
-    showAuthMessage(signupForm, role === 'admin' ? 'Admin account created. Opening the dashboard…' : 'Account created. Opening your account…', false);
+    showAuthMessage(signupForm, role === 'admin' ? 'Admin account created. Opening the dashboard.' : 'Account created. Opening your account.', false);
     setTimeout(() => { window.location.href = next === 'admin.html' && role !== 'admin' ? 'index.html' : next; }, 500);
   });
 }
@@ -451,6 +482,7 @@ async function syncCloudOrders() {
       const orders = data.map((row) => ({ ...row.payload, id: row.id, status: row.status, total: Number(row.total), createdAt: new Date(row.created_at).toLocaleString() }));
       saveOrders(orders);
       renderAdmin();
+      renderDriverOrders();
     }
   } catch (error) { console.warn('Cloud order sync unavailable.', error); }
 }
@@ -471,7 +503,7 @@ document.addEventListener('submit', async (event) => {
       if (!result.session) { showAuthMessage(form, 'Check your email to confirm your new account, then log in.', false); return; }
       const profile = await cloudProfile(client, result.user);
       setCurrentUser(profile);
-      showAuthMessage(form, 'Account created. Opening your account…', false);
+      showAuthMessage(form, 'Account created. Opening your account.', false);
       setTimeout(() => { window.location.href = next === 'admin.html' && profile.role !== 'admin' ? 'index.html' : next; }, 450);
     } else {
       const { data: result, error } = await client.auth.signInWithPassword({ email: data.email.trim(), password: data.password });
@@ -607,5 +639,6 @@ if (packageSizeSelect && !document.querySelector('.package-size-guide')) {
     descriptionField.classList.add('form-wide');
     formGrid.prepend(descriptionField);
   }
-  detailsSection?.insertAdjacentHTML('beforebegin', '<aside class="package-size-guide package-guide-card"><p class="eyebrow">Choose the right size</p><h2>Package size guide</h2><div><span><b>Small — $5</b>All small food deliveries, documents, medications, and other hand-sized items.</span><span><b>Medium — $10</b>Grocery bags, shoeboxes, retail purchases, and medium boxes.</span><span><b>Large — $20</b>Large boxes, multiple bags, and bulky items that fit safely in a standard vehicle.</span><span><b>Extra Large — from $50</b>Appliances, furniture, and other oversized items.</span></div></aside>');
+  detailsSection?.insertAdjacentHTML('beforebegin', '<aside class="package-size-guide package-guide-card"><p class="eyebrow">Choose the right size</p><h2>Package size guide</h2><div><span><b>Small - $5</b>All small food deliveries, documents, medications, and other hand-sized items.</span><span><b>Medium - $10</b>Grocery bags, shoeboxes, retail purchases, and medium boxes.</span><span><b>Large - $20</b>Large boxes, multiple bags, and bulky items that fit safely in a standard vehicle.</span><span><b>Extra Large - from $50</b>Appliances, furniture, and other oversized items.</span></div></aside>');
 }
+
