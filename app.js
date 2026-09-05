@@ -460,7 +460,7 @@ function initializeAuthPage() {
 const adminOnlyPage = location.pathname.toLowerCase().endsWith('/admin.html');
 const driverOnlyPage = location.pathname.toLowerCase().endsWith('/driver.html');
 if ((adminOnlyPage || driverOnlyPage) && currentUser()?.role !== 'admin') {
-  window.location.replace(`auth.html?next=${driverOnlyPage ? 'driver.html' : 'admin.html'}`);
+  window.location.replace(`login.html?next=${driverOnlyPage ? 'driver.html' : 'admin.html'}`);
 } else {
   accountNavigation(); initializeAuthPage();
 }
@@ -471,20 +471,25 @@ async function cloudProfile(client, user) {
   return { id: user.id, name: data.full_name || user.email, email: user.email, role: data.role };
 }
 
+let hhtDispatchChannel;
 async function syncCloudOrders() {
   try {
     const client = await hhtSupabaseReady;
     const { data: { user } } = await client.auth.getUser();
-    if (!user) return;
+    if (!user) { if (adminOnlyPage || driverOnlyPage) window.location.replace(`login.html?next=${driverOnlyPage ? 'driver.html' : 'admin.html'}`); return; }
+    const profile = await cloudProfile(client, user);
+    if ((adminOnlyPage || driverOnlyPage) && profile.role !== 'admin') { window.location.replace('index.html'); return; }
+    setCurrentUser(profile);
     const { data, error } = await client.from('orders').select('*').order('created_at', { ascending: false });
     if (error) throw error;
     const dashboardNotice = document.querySelector('.dashboard-note');
-    if (dashboardNotice) dashboardNotice.textContent = 'View and manage all customer ride and delivery requests, including requests made without an account.';
-    if (data?.length) {
-      const orders = data.map((row) => ({ ...row.payload, id: row.id, status: row.status, total: Number(row.total), createdAt: new Date(row.created_at).toLocaleString() }));
-      saveOrders(orders);
-      renderAdmin();
-      renderDriverOrders();
+    if (dashboardNotice) dashboardNotice.textContent = 'Live dispatch is connected. New ride and delivery requests update automatically.';
+    const orders = (data || []).map((row) => ({ ...row.payload, id: row.id, status: row.status, total: Number(row.total), createdAt: new Date(row.created_at).toLocaleString() }));
+    saveOrders(orders);
+    renderAdmin();
+    renderDriverOrders();
+    if (!hhtDispatchChannel && (adminOnlyPage || driverOnlyPage)) {
+      hhtDispatchChannel = client.channel('hht-live-dispatch').on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => syncCloudOrders()).subscribe();
     }
   } catch (error) { console.warn('Cloud order sync unavailable.', error); }
 }
