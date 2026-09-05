@@ -472,6 +472,7 @@ async function cloudProfile(client, user) {
 }
 
 let hhtDispatchChannel;
+let hhtDispatchPoll;
 async function syncCloudOrders() {
   try {
     const client = await hhtSupabaseReady;
@@ -491,6 +492,7 @@ async function syncCloudOrders() {
     if (!hhtDispatchChannel && (adminOnlyPage || driverOnlyPage)) {
       hhtDispatchChannel = client.channel('hht-live-dispatch').on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => syncCloudOrders()).subscribe();
     }
+    if (!hhtDispatchPoll && (adminOnlyPage || driverOnlyPage)) hhtDispatchPoll = window.setInterval(syncCloudOrders, 20000);
   } catch (error) { console.warn('Cloud order sync unavailable.', error); }
 }
 
