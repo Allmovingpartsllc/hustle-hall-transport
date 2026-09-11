@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+
+Disallow: /admin.html
+Disallow: /admin-login.html
+Disallow: /auth.html
+Disallow: /login.html
+Disallow: /portal.html
+Disallow: /operations.html
+Disallow: /receipt.html
+Disallow: /tracking.html
+Disallow: /driver.html
+
+Sitemap: https://hustlehall.allmovingparts.com/sitemap.xml
