@@ -133,7 +133,6 @@ function calculateRide(form) {
   const longTripMiles = Math.max(0, miles - 20);
   const mileCharge = (firstTierMiles * 0.95) + (longTripMiles * 0.85);
   const minuteCharge = minutes * 0.15;
-  const total = Math.max(minimumFare, base + mileCharge + minuteCharge);
   const subtotal = Math.max(minimumFare, base + mileCharge + minuteCharge);
   const promo = calculatePromo(form, subtotal);
   const total = Math.max(0, subtotal - promo.promoDiscount);
