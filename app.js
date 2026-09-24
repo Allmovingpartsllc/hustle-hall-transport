@@ -188,7 +188,7 @@ addPaymentFields();
 function addPromoFields() {
   document.querySelectorAll('[data-booking-form]').forEach((form) => {
     if (form.elements.promoCode) return;
-    form.querySelector('.quote-card')?.insertAdjacentHTML('beforebegin', '<section class="promo-section"><h2>Promo code</h2><div class="form-grid"><label class="form-wide">Enter a promo code (optional)<input name="promoCode" autocomplete="off" autocapitalize="characters" placeholder="Example: SCHOOL"></label></div><p class="promo-message" data-promo-message aria-live="polite"></p></section>');
+    form.querySelector('.quote-card')?.insertAdjacentHTML('beforebegin', '<section class="promo-section"><h2>Promo code</h2><div class="form-grid"><label class="form-wide">Enter a promo code (optional)<input name="promoCode" autocomplete="off" autocapitalize="characters"></label></div><p class="promo-message" data-promo-message aria-live="polite"></p></section>');
     form.querySelector('.quote-total')?.insertAdjacentHTML('beforebegin', '<div class="quote-row" data-promo-discount-row hidden><span>Promo discount</span><strong data-promo-discount>-$0.00</strong></div>');
   });
 }
