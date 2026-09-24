@@ -35,10 +35,44 @@ if (menuButton && mainNavigation) {
 
 const HHT_ORDERS = 'hht-orders';
 const PRICES = { small: 5, medium: 10, large: 20, extraLarge: 50 };
+const PROMO_CODES = {
+  WELCOME10: { type: 'percent', value: 10, maxDiscount: 5, label: '10% off, up to $5' },
+  LOCAL5: { type: 'fixed', value: 5, minimumSubtotal: 15, label: '$5 off orders of $15 or more' },
+  SCHOOL: { type: 'percent', value: 20, maxDiscount: 5, service: 'ride', label: '20% off rides, up to $5' }
+};
 const statuses = ['Requested', 'Accepted', 'Rejected', 'Cancelled', 'Driver Assigned', 'Driver En Route', 'Picked Up', 'In Transit', 'Delivered', 'Completed'];
 const readOrders = () => JSON.parse(localStorage.getItem(HHT_ORDERS) || '[]');
 const saveOrders = (orders) => localStorage.setItem(HHT_ORDERS, JSON.stringify(orders));
-const money = (value) => `$${Number(value || 0).toFixed(2)}`;
+const money = (value) => `${Number(value || 0).toFixed(2)}`;
+
+function calculatePromo(form, subtotal) {
+  const code = String(form.elements.promoCode?.value || '').trim().toUpperCase();
+  const message = form.querySelector('[data-promo-message]');
+  const discountRow = form.querySelector('[data-promo-discount-row]');
+  const discountValue = form.querySelector('[data-promo-discount]');
+  const promo = PROMO_CODES[code];
+  let discount = 0;
+  let messageText = '';
+  if (code && !promo) {
+    messageText = 'That promo code is not available.';
+  } else if (promo?.service && promo.service !== form.dataset.service) {
+    messageText = 'This promo applies to rides only.';
+  } else if (promo?.minimumSubtotal && subtotal < promo.minimumSubtotal) {
+    messageText = `This code requires a minimum order of ${money(promo.minimumSubtotal)}.`;
+  } else if (promo) {
+    const rawDiscount = promo.type === 'percent' ? subtotal * (promo.value / 100) : promo.value;
+    discount = Math.min(subtotal, promo.maxDiscount || rawDiscount);
+    messageText = `${code} applied: ${promo.label}.`;
+  }
+  if (message) {
+    message.textContent = messageText;
+    message.classList.toggle('is-error', Boolean(code && !discount));
+    message.classList.toggle('is-success', Boolean(discount));
+  }
+  if (discountRow) discountRow.hidden = !discount;
+  if (discountValue) discountValue.textContent = `-${money(discount)}`;
+  return { promoCode: discount ? code : '', promoDiscount: discount, promoLabel: discount ? promo.label : '' };
+}
 const makeId = () => `HHT-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}-${String(Date.now()).slice(-5)}`;
 
 async function sendOrderNotification(order, event = 'booking') {
@@ -67,10 +101,13 @@ function calculatePackage(form) {
   const miles = Number(form.elements.miles?.value || 0);
   const additionalMiles = Math.max(0, miles - 20);
   const surcharge = miles > 20 ? 10 + (additionalMiles * 0.35) : 0;
+  const subtotal = base + surcharge;
+  const promo = calculatePromo(form, subtotal);
+  const total = Math.max(0, subtotal - promo.promoDiscount);
   form.querySelector('[data-base-price]').textContent = money(base);
   form.querySelector('[data-surcharge]').textContent = money(surcharge);
-  form.querySelector('[data-total]').textContent = money(base + surcharge);
-  return { base, miles, additionalMiles, surcharge, total: base + surcharge, size };
+  form.querySelector('[data-total]').textContent = money(total);
+  return { base, miles, additionalMiles, surcharge, subtotal, total, size, ...promo };
 }
 
 function calculateRide(form) {
@@ -85,7 +122,8 @@ function calculateRide(form) {
     form.querySelector('[data-mile-charge]').textContent = 'Schedule based';
     form.querySelector('[data-minute-charge]').textContent = serviceDays ? `${serviceDays} day${serviceDays === 1 ? '' : 's'}` : 'Select dates';
     form.querySelector('[data-ride-total]').textContent = 'Quote pending';
-    return { base: 0, minimumFare: 0, miles: 0, minutes: 0, firstTierMiles: 0, longTripMiles: 0, mileCharge: 0, minuteCharge: 0, surcharge: 0, total: 0, quotePending: true, serviceDays };
+    const promo = calculatePromo(form, 0);
+    return { base: 0, minimumFare: 0, miles: 0, minutes: 0, firstTierMiles: 0, longTripMiles: 0, mileCharge: 0, minuteCharge: 0, surcharge: 0, total: 0, quotePending: true, serviceDays, ...promo };
   }
   const miles = Math.max(0, Number(form.elements.miles?.value || 0));
   const minutes = Math.max(0, Number(form.elements.minutes?.value || 0));
@@ -96,11 +134,14 @@ function calculateRide(form) {
   const mileCharge = (firstTierMiles * 0.95) + (longTripMiles * 0.85);
   const minuteCharge = minutes * 0.15;
   const total = Math.max(minimumFare, base + mileCharge + minuteCharge);
+  const subtotal = Math.max(minimumFare, base + mileCharge + minuteCharge);
+  const promo = calculatePromo(form, subtotal);
+  const total = Math.max(0, subtotal - promo.promoDiscount);
   form.querySelector('[data-ride-base]').textContent = money(base);
   form.querySelector('[data-mile-charge]').textContent = money(mileCharge);
   form.querySelector('[data-minute-charge]').textContent = money(minuteCharge);
   form.querySelector('[data-ride-total]').textContent = money(total);
-  return { base, minimumFare, miles, minutes, firstTierMiles, longTripMiles, mileCharge, minuteCharge, surcharge: 0, total, quotePending: false };
+  return { base, minimumFare, miles, minutes, firstTierMiles, longTripMiles, mileCharge, minuteCharge, surcharge: 0, subtotal, total, quotePending: false, ...promo };
 }
 
 function addSchedulingFields() {
@@ -135,6 +176,16 @@ function addPaymentFields() {
 
 addPaymentFields();
 
+function addPromoFields() {
+  document.querySelectorAll('[data-booking-form]').forEach((form) => {
+    if (form.elements.promoCode) return;
+    form.querySelector('.quote-card')?.insertAdjacentHTML('beforebegin', '<section class="promo-section"><h2>Promo code</h2><div class="form-grid"><label class="form-wide">Enter a promo code (optional)<input name="promoCode" autocomplete="off" autocapitalize="characters" placeholder="Example: SCHOOL"></label></div><p class="promo-message" data-promo-message aria-live="polite"></p></section>');
+    form.querySelector('.quote-total')?.insertAdjacentHTML('beforebegin', '<div class="quote-row" data-promo-discount-row hidden><span>Promo discount</span><strong data-promo-discount>-$0.00</strong></div>');
+  });
+}
+
+addPromoFields();
+
 function setupMultiRideBooking(form) {
   if (form.dataset.service !== 'ride' || !form.elements.rideType) return;
   const rideType = form.elements.rideType;
@@ -160,6 +211,9 @@ function setupMultiRideBooking(form) {
     if (form.elements.minutes) form.elements.minutes.disabled = isMultiRide;
     if (paymentSection) paymentSection.hidden = isMultiRide;
     if (paymentNotice) paymentNotice.hidden = isMultiRide;
+    const promoSection = form.querySelector('.promo-section');
+    if (promoSection) promoSection.hidden = isMultiRide;
+    if (form.elements.promoCode) form.elements.promoCode.disabled = isMultiRide;
     quoteText.textContent = isMultiRide
       ? 'Multi-day requests are reviewed before payment. We will confirm availability, the final schedule, and your custom quote before charging you.'
       : 'No surge pricing. $5 base fare, plus $0.95 per mile for the first 20 miles, $0.85 per mile after 20 miles, and $0.15 per minute. This is an estimate; tolls, added stops, or route changes may change the final total.';
