@@ -74,6 +74,19 @@ function calculatePackage(form) {
 }
 
 function calculateRide(form) {
+  const isMultiRide = form.elements.rideType?.value === 'multi';
+  if (isMultiRide) {
+    const startDate = form.elements.startDate?.value;
+    const endDate = form.elements.endDate?.value;
+    const start = startDate ? new Date(`${startDate}T12:00:00`) : null;
+    const end = endDate ? new Date(`${endDate}T12:00:00`) : null;
+    const serviceDays = start && end && end >= start ? Math.floor((end - start) / 86400000) + 1 : null;
+    form.querySelector('[data-ride-base]').textContent = 'Custom';
+    form.querySelector('[data-mile-charge]').textContent = 'Schedule based';
+    form.querySelector('[data-minute-charge]').textContent = serviceDays ? `${serviceDays} day${serviceDays === 1 ? '' : 's'}` : 'Select dates';
+    form.querySelector('[data-ride-total]').textContent = 'Quote pending';
+    return { base: 0, minimumFare: 0, miles: 0, minutes: 0, firstTierMiles: 0, longTripMiles: 0, mileCharge: 0, minuteCharge: 0, surcharge: 0, total: 0, quotePending: true, serviceDays };
+  }
   const miles = Math.max(0, Number(form.elements.miles?.value || 0));
   const minutes = Math.max(0, Number(form.elements.minutes?.value || 0));
   const minimumFare = 5;
@@ -87,7 +100,7 @@ function calculateRide(form) {
   form.querySelector('[data-mile-charge]').textContent = money(mileCharge);
   form.querySelector('[data-minute-charge]').textContent = money(minuteCharge);
   form.querySelector('[data-ride-total]').textContent = money(total);
-  return { base, minimumFare, miles, minutes, firstTierMiles, longTripMiles, mileCharge, minuteCharge, surcharge: 0, total };
+  return { base, minimumFare, miles, minutes, firstTierMiles, longTripMiles, mileCharge, minuteCharge, surcharge: 0, total, quotePending: false };
 }
 
 function addSchedulingFields() {
@@ -122,6 +135,42 @@ function addPaymentFields() {
 
 addPaymentFields();
 
+function setupMultiRideBooking(form) {
+  if (form.dataset.service !== 'ride' || !form.elements.rideType) return;
+  const rideType = form.elements.rideType;
+  const multiFields = form.querySelector('[data-multi-ride-fields]');
+  const routeTools = form.querySelector('.route-tools');
+  const routeMap = form.querySelector('[data-route-map]');
+  const distanceLabel = form.elements.miles?.closest('label');
+  const timeLabel = form.elements.minutes?.closest('label');
+  const paymentSection = form.querySelector('.payment-section');
+  const paymentNotice = form.querySelector('.payment-disclaimer');
+  const quoteText = form.querySelector('.quote-card p:last-child');
+  const refresh = () => {
+    const isMultiRide = rideType.value === 'multi';
+    multiFields.hidden = !isMultiRide;
+    multiFields.querySelectorAll('input, textarea').forEach((field) => {
+      field.disabled = !isMultiRide;
+      field.required = isMultiRide;
+    });
+    [distanceLabel, timeLabel, routeTools, routeMap].filter(Boolean).forEach((element) => {
+      element.hidden = isMultiRide;
+    });
+    if (form.elements.miles) form.elements.miles.disabled = isMultiRide;
+    if (form.elements.minutes) form.elements.minutes.disabled = isMultiRide;
+    if (paymentSection) paymentSection.hidden = isMultiRide;
+    if (paymentNotice) paymentNotice.hidden = isMultiRide;
+    quoteText.textContent = isMultiRide
+      ? 'Multi-day requests are reviewed before payment. We will confirm availability, the final schedule, and your custom quote before charging you.'
+      : 'No surge pricing. $5 base fare, plus $0.95 per mile for the first 20 miles, $0.85 per mile after 20 miles, and $0.15 per minute. This is an estimate; tolls, added stops, or route changes may change the final total.';
+    calculateRide(form);
+  };
+  rideType.addEventListener('change', refresh);
+  refresh();
+}
+
+document.querySelectorAll('[data-booking-form]').forEach((form) => setupMultiRideBooking(form));
+
 document.querySelectorAll('[data-booking-form]').forEach((form) => {
   const calculator = form.dataset.service === 'package' ? calculatePackage : calculateRide;
   form.addEventListener('input', () => calculator(form));
@@ -147,6 +196,10 @@ document.querySelectorAll('[data-booking-form]').forEach((form) => {
     try {
       await sendOrderNotification(order);
     } catch (error) { console.warn('Email notification unavailable.', error); }
+    if (order.quotePending) {
+      window.location.href = `receipt.html?id=${encodeURIComponent(order.id)}`;
+      return;
+    }
     if (order.paymentMethod === 'Stripe') {
       try {
         await startStripeCheckout(order);
