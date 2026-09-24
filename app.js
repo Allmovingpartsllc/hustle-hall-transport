@@ -38,40 +38,50 @@ const PRICES = { small: 5, medium: 10, large: 20, extraLarge: 50 };
 const PROMO_CODES = {
   WELCOME10: { type: 'percent', value: 10, maxDiscount: 5, label: '10% off, up to $5' },
   LOCAL5: { type: 'fixed', value: 5, minimumSubtotal: 15, label: '$5 off orders of $15 or more' },
-  SCHOOL: { type: 'percent', value: 20, maxDiscount: 5, service: 'ride', label: '20% off rides, up to $5' }
+  SCHOOL: { type: 'percent', value: 20, maxDiscount: 5, service: 'ride', allowMultiRide: true, label: '20% off rides, up to $5' }
 };
 const statuses = ['Requested', 'Accepted', 'Rejected', 'Cancelled', 'Driver Assigned', 'Driver En Route', 'Picked Up', 'In Transit', 'Delivered', 'Completed'];
 const readOrders = () => JSON.parse(localStorage.getItem(HHT_ORDERS) || '[]');
 const saveOrders = (orders) => localStorage.setItem(HHT_ORDERS, JSON.stringify(orders));
 const money = (value) => `${Number(value || 0).toFixed(2)}`;
 
-function calculatePromo(form, subtotal) {
+function calculatePromo(form, subtotal, options = {}) {
   const code = String(form.elements.promoCode?.value || '').trim().toUpperCase();
   const message = form.querySelector('[data-promo-message]');
   const discountRow = form.querySelector('[data-promo-discount-row]');
   const discountValue = form.querySelector('[data-promo-discount]');
   const promo = PROMO_CODES[code];
+  const isMultiRide = form.dataset.service === 'ride' && form.elements.rideType?.value === 'multi';
   let discount = 0;
+  let accepted = false;
+  let pending = false;
   let messageText = '';
   if (code && !promo) {
     messageText = 'That promo code is not available.';
   } else if (promo?.service && promo.service !== form.dataset.service) {
     messageText = 'This promo applies to rides only.';
+  } else if (isMultiRide && !promo?.allowMultiRide) {
+    messageText = 'Only the SCHOOL promo can be applied to a multi-day ride request.';
+  } else if (isMultiRide && promo?.allowMultiRide) {
+    accepted = true;
+    pending = true;
+    messageText = `${code} saved. ${promo.label} will be applied when your multi-day quote is approved.`;
   } else if (promo?.minimumSubtotal && subtotal < promo.minimumSubtotal) {
     messageText = `This code requires a minimum order of ${money(promo.minimumSubtotal)}.`;
   } else if (promo) {
     const rawDiscount = promo.type === 'percent' ? subtotal * (promo.value / 100) : promo.value;
     discount = Math.min(subtotal, promo.maxDiscount || rawDiscount);
+    accepted = true;
     messageText = `${code} applied: ${promo.label}.`;
   }
   if (message) {
     message.textContent = messageText;
-    message.classList.toggle('is-error', Boolean(code && !discount));
-    message.classList.toggle('is-success', Boolean(discount));
+    message.classList.toggle('is-error', Boolean(code && !accepted));
+    message.classList.toggle('is-success', accepted);
   }
   if (discountRow) discountRow.hidden = !discount;
   if (discountValue) discountValue.textContent = `-${money(discount)}`;
-  return { promoCode: discount ? code : '', promoDiscount: discount, promoLabel: discount ? promo.label : '' };
+  return { promoCode: accepted ? code : '', promoDiscount: discount, promoLabel: accepted ? promo.label : '', promoPending: pending };
 }
 const makeId = () => `HHT-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}-${String(Date.now()).slice(-5)}`;
 
@@ -122,7 +132,7 @@ function calculateRide(form) {
     form.querySelector('[data-mile-charge]').textContent = 'Schedule based';
     form.querySelector('[data-minute-charge]').textContent = serviceDays ? `${serviceDays} day${serviceDays === 1 ? '' : 's'}` : 'Select dates';
     form.querySelector('[data-ride-total]').textContent = 'Quote pending';
-    const promo = calculatePromo(form, 0);
+    const promo = calculatePromo(form, 0, { allowPending: true });
     return { base: 0, minimumFare: 0, miles: 0, minutes: 0, firstTierMiles: 0, longTripMiles: 0, mileCharge: 0, minuteCharge: 0, surcharge: 0, total: 0, quotePending: true, serviceDays, ...promo };
   }
   const miles = Math.max(0, Number(form.elements.miles?.value || 0));
@@ -267,7 +277,7 @@ document.querySelectorAll('[data-booking-form]').forEach((form) => {
   });
 });
 
-function orderDetails(order) { return `<div class="detail-list"><div><span>Service</span><strong>${order.service}</strong></div><div><span>Status</span><strong><i class="status-pill">${order.status}</i></strong></div><div><span>Pickup</span><strong>${order.pickup}</strong></div><div><span>Delivery</span><strong>${order.delivery}</strong></div><div><span>Customer</span><strong>${order.customerName}</strong></div><div><span>Phone</span><strong>${order.phone}</strong></div><div><span>Promo</span><strong>${order.promoCode ? `${order.promoCode} (-${money(order.promoDiscount)})` : 'None'}</strong></div></div>`; }
+function orderDetails(order) { return `<div class="detail-list"><div><span>Service</span><strong>${order.service}</strong></div><div><span>Status</span><strong><i class="status-pill">${order.status}</i></strong></div><div><span>Pickup</span><strong>${order.pickup}</strong></div><div><span>Delivery</span><strong>${order.delivery}</strong></div><div><span>Customer</span><strong>${order.customerName}</strong></div><div><span>Phone</span><strong>${order.phone}</strong></div><div><span>Promo</span><strong>${order.promoCode ? (order.promoPending ? `${order.promoCode} (apply to final quote)` : `${order.promoCode} (-${money(order.promoDiscount)})`) : 'None'}</strong></div></div>`; }
 
 const trackingForm = document.querySelector('[data-tracking-form]');
 if (trackingForm) trackingForm.addEventListener('submit', (event) => { event.preventDefault(); const q = new FormData(trackingForm).get('lookup').trim().toLowerCase(); const matches = readOrders().filter(o => o.id.toLowerCase() === q || o.phone.replace(/\D/g, '') === q.replace(/\D/g, '')); const result = document.querySelector('[data-tracking-result]'); result.innerHTML = matches.length ? matches.map(o => `<article class="result-card"><h2>${o.id}</h2>${orderDetails(o)}<a class="button button-secondary" href="receipt.html?id=${encodeURIComponent(o.id)}">View receipt</a></article>`).join('') : '<p>No order was found. Check the receipt number or phone number and try again.</p>'; });
