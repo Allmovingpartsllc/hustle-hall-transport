@@ -153,3 +153,20 @@ body { background: var(--paper); }
   .booking-form > .button { width: 100%; min-height: 52px; }
   .check { padding: 4px 2px; }
 }
+
+/* Promotions */
+.promo-section { padding: 24px 28px !important; }
+.promo-section h2 { margin-bottom: 15px; }
+.promo-message { min-height: 1.35em; margin: 12px 0 0; color: var(--ink-soft); font-size: .88rem; font-weight: 700; }
+.promo-message.is-success { color: #13733d; }
+.promo-message.is-error { color: #b20d47; }
+.quote-row[data-promo-discount-row] strong { color: #ff9bc4; }
+.promo-directory { margin: 26px 0; padding: 25px; background: var(--white); border: 1px solid var(--line); border-radius: 15px; box-shadow: 0 10px 30px rgba(55, 5, 29, .07); }
+.promo-directory h2 { margin-bottom: 18px; font-size: 1.45rem; }
+.promo-code-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.promo-code-grid article { padding: 15px; background: var(--rose); border: 1px solid #f1cede; border-radius: 10px; }
+.promo-code-grid strong { display: block; margin-bottom: 6px; color: var(--pink-dark); font: 800 1rem "Manrope", sans-serif; letter-spacing: .06em; }
+.promo-code-grid span, .promo-admin-note { color: var(--ink-soft); font-size: .83rem; }
+.promo-school { background: linear-gradient(135deg, #fff0f7, #fff) !important; border-color: #eb8db9 !important; }
+.promo-admin-note { margin: 15px 0 0; }
+@media (max-width: 760px) { .promo-section { padding: 21px 17px !important; }.promo-code-grid { grid-template-columns: 1fr; }.promo-directory { padding: 20px 17px; } }
