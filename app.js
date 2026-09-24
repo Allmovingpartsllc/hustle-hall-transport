@@ -179,7 +179,7 @@ document.querySelectorAll('[data-booking-form]').forEach((form) => {
     event.preventDefault();
     const fields = Object.fromEntries(new FormData(form));
     const quote = calculator(form);
-    const order = { id: makeId(), service: form.dataset.service, status: 'Requested', createdAt: new Date().toLocaleString(), accountId: currentUser()?.id || null, ...fields, ...quote, paymentStatus: fields.paymentMethod === 'Stripe' ? 'Awaiting payment' : 'Pay in Person' };
+    const order = { id: makeId(), service: form.dataset.service, status: 'Requested', createdAt: new Date().toLocaleString(), accountId: currentUser()?.id || null, ...fields, ...quote, paymentStatus: quote.quotePending ? 'Quote pending' : (fields.paymentMethod === 'Stripe' ? 'Awaiting payment' : 'Pay in Person') };
     const orders = readOrders(); orders.unshift(order); saveOrders(orders);
     try {
       const client = await hhtSupabaseReady;
