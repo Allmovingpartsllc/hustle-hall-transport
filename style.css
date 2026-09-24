@@ -134,3 +134,22 @@ body { background: var(--paper); }
 .multi-ride-fields { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--line); }
 .multi-ride-fields[hidden] { display: none; }
 .quote-card [data-ride-total] { text-align: right; }
+
+/* Mobile-first booking refinements */
+@media (max-width: 760px) {
+  .page-main { padding: 40px 0 56px; }
+  .page-title { font-size: clamp(2.15rem, 11vw, 3.1rem); }
+  .page-intro { margin-bottom: 25px; font-size: 1rem; }
+  .booking-form { gap: 16px; }
+  .booking-form section { padding: 21px 17px; border-radius: 14px; }
+  .booking-form h2 { margin-bottom: 17px; }
+  .booking-form input, .booking-form select, .booking-form textarea { min-height: 48px; font-size: 16px; }
+  .booking-form textarea { min-height: 112px; }
+  .ride-type-section { padding: 21px 17px !important; }
+  .multi-ride-fields { gap: 14px; margin-top: 16px; padding-top: 17px; }
+  .quote-card { padding: 21px 17px; border-radius: 14px; }
+  .quote-row { align-items: flex-start; gap: 15px; }
+  .quote-row strong, .quote-total strong { max-width: 52%; }
+  .booking-form > .button { width: 100%; min-height: 52px; }
+  .check { padding: 4px 2px; }
+}
