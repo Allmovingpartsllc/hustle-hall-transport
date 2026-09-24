@@ -74,17 +74,20 @@ function calculatePackage(form) {
 }
 
 function calculateRide(form) {
-  const miles = Number(form.elements.miles?.value || 0);
-  const base = miles <= 5 ? 5 : 4.25;
-  const minutes = Number(form.elements.minutes?.value || 0);
-  const mileCharge = miles * 0.25;
-  const minuteCharge = minutes * 0.1;
-  const total = base + mileCharge + minuteCharge;
+  const miles = Math.max(0, Number(form.elements.miles?.value || 0));
+  const minutes = Math.max(0, Number(form.elements.minutes?.value || 0));
+  const minimumFare = 5;
+  const base = 5;
+  const firstTierMiles = Math.min(miles, 20);
+  const longTripMiles = Math.max(0, miles - 20);
+  const mileCharge = (firstTierMiles * 0.95) + (longTripMiles * 0.85);
+  const minuteCharge = minutes * 0.15;
+  const total = Math.max(minimumFare, base + mileCharge + minuteCharge);
   form.querySelector('[data-ride-base]').textContent = money(base);
   form.querySelector('[data-mile-charge]').textContent = money(mileCharge);
   form.querySelector('[data-minute-charge]').textContent = money(minuteCharge);
   form.querySelector('[data-ride-total]').textContent = money(total);
-  return { base, miles, minutes, mileCharge, minuteCharge, surcharge: 0, total, shortTripBase: miles <= 5 };
+  return { base, minimumFare, miles, minutes, firstTierMiles, longTripMiles, mileCharge, minuteCharge, surcharge: 0, total };
 }
 
 function addSchedulingFields() {
@@ -108,7 +111,7 @@ function addSchedulingFields() {
 
 addSchedulingFields();
 
-document.querySelector('[data-service="ride"] .quote-card p:last-child')?.replaceChildren('5 miles or less: $5 base fare. More than 5 miles: $4.25 base fare. Plus $0.25 per mile and $0.10 per minute.');
+document.querySelector('[data-service="ride"] .quote-card p:last-child')?.replaceChildren('No surge pricing. $5 base fare, plus $0.95 per mile for the first 20 miles, $0.85 per mile after 20 miles, and $0.15 per minute. This is an estimate; tolls, added stops, or route changes may change the final total.');
 
 function addPaymentFields() {
   document.querySelectorAll('[data-booking-form]').forEach((form) => {
