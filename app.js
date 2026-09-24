@@ -35,6 +35,7 @@ if (menuButton && mainNavigation) {
 
 const HHT_ORDERS = 'hht-orders';
 const PRICES = { small: 5, medium: 10, large: 20, extraLarge: 50 };
+const PROMO_MINIMUM_SUBTOTAL = 15;
 const PROMO_CODES = {
   WELCOME10: { type: 'percent', value: 10, maxDiscount: 5, label: '10% off, up to $5' },
   LOCAL5: { type: 'fixed', value: 5, minimumSubtotal: 15, label: '$5 off orders of $15 or more' },
@@ -66,8 +67,8 @@ function calculatePromo(form, subtotal, options = {}) {
     accepted = true;
     pending = true;
     messageText = `${code} saved. ${promo.label} will be applied when your multi-day quote is approved.`;
-  } else if (promo?.minimumSubtotal && subtotal < promo.minimumSubtotal) {
-    messageText = `This code requires a minimum order of ${money(promo.minimumSubtotal)}.`;
+  } else if (subtotal < Math.max(PROMO_MINIMUM_SUBTOTAL, promo?.minimumSubtotal || 0)) {
+    messageText = `Promo codes require a minimum order of ${money(Math.max(PROMO_MINIMUM_SUBTOTAL, promo?.minimumSubtotal || 0))} before discounts.`;
   } else if (promo) {
     const rawDiscount = promo.type === 'percent' ? subtotal * (promo.value / 100) : promo.value;
     discount = Math.min(subtotal, promo.maxDiscount || rawDiscount);
