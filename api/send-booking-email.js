@@ -109,6 +109,15 @@ function messageCopy(event, order, serviceName) {
       customerText: `Your ${serviceName} request is now marked ${order.status}.`
     };
   }
+  if (order.status === 'Pending Approval') {
+    return {
+      businessTitle: 'Ride overlap needs approval',
+      businessText: 'This passenger ride overlaps another booking and needs manual approval before payment or confirmation.',
+      customerSubject: `Your Hustle Hall Transport ride is pending approval - ${order.id}`,
+      customerTitle: 'Ride pending approval',
+      customerText: 'We received your ride request. The requested time overlaps another passenger booking, so we are reviewing availability before confirming the ride or taking online payment.'
+    };
+  }
   return {
     businessTitle: 'New Hustle Hall request',
     businessText: `A customer has submitted a ${serviceName} request.`,
