@@ -18,7 +18,7 @@ firebase.messaging().onBackgroundMessage((payload) => {
   });
 });
 
-const CACHE_NAME = 'hustle-hall-v45';
+const CACHE_NAME = 'hustle-hall-v46';
 const APP_FILES = [
   './',
   './index.html',
