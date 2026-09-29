@@ -107,7 +107,6 @@ async function startStripeCheckout(order) {
 }
 
 async function checkRideAvailability(order) {
-  if (order.service === 'package') return { requiresApproval: false, reason: 'Package deliveries may overlap.' };
   if (order.quotePending) return { requiresApproval: true, reason: 'Multi-day ride requests require approval.' };
   try {
     const response = await fetch('/api/check-booking-availability', {
