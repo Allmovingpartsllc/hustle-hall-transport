@@ -79,8 +79,8 @@ async function closeEnough(newOrder, existingOrder) {
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
   const order = req.body?.order;
-  if (!order || order.service !== 'ride') {
-    return res.status(200).json({ requiresApproval: false, reason: 'Package deliveries may overlap.' });
+  if (!order || !['ride', 'package'].includes(order.service)) {
+    return res.status(400).json({ error: 'A ride or package request is required.' });
   }
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return res.status(503).json({ error: 'Secure booking availability is not configured.' });
@@ -95,7 +95,7 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const url = `${SUPABASE_URL}/rest/v1/orders?service=eq.ride&select=id,status,payload`;
+    const url = `${SUPABASE_URL}/rest/v1/orders?select=id,status,payload`;
     const response = await fetch(url, {
       headers: {
         apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -110,14 +110,13 @@ module.exports = async function handler(req, res) {
       const existing = { ...(row.payload || {}), status: row.status || row.payload?.status };
       if (NON_BLOCKING_STATUSES.has(existing.status)) continue;
       if (!overlaps(requestedWindow, bookingWindow(existing))) continue;
-      const nearby = await closeEnough(order, existing);
-      conflicts.push({ id: row.id, nearby });
+      conflicts.push({ id: row.id, service: existing.service || row.payload?.service || 'request' });
     }
 
     if (conflicts.length) {
       return res.status(200).json({
         requiresApproval: true,
-        reason: 'This ride overlaps another active passenger ride and needs manual approval before confirmation or payment.',
+        reason: 'This request overlaps another active booking and needs manual approval before confirmation or payment.',
         conflicts: conflicts.map((item) => item.id)
       });
     }
@@ -125,7 +124,7 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({
       requiresApproval: false,
       nearbyOverlap: false,
-      reason: 'No passenger ride conflict was found.'
+      reason: 'No active schedule conflict was found.'
     });
   } catch (error) {
     console.error('Booking availability error:', error);
