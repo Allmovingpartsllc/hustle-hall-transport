@@ -293,13 +293,11 @@ document.querySelectorAll('[data-booking-form]').forEach((form) => {
       deliveryLon: deliveryField?.dataset.lon || '',
       paymentStatus: quote.quotePending ? 'Quote pending' : (fields.paymentMethod === 'Stripe' ? 'Awaiting payment' : 'Pay in Person')
     };
-    if (order.service === 'ride') {
-      const availability = await checkRideAvailability(order);
-      order.availabilityCheck = availability;
-      if (availability.requiresApproval) {
-        order.status = 'Pending Approval';
-        order.paymentStatus = 'Approval pending';
-      }
+    const availability = await checkRideAvailability(order);
+    order.availabilityCheck = availability;
+    if (availability.requiresApproval) {
+      order.status = 'Pending Approval';
+      order.paymentStatus = 'Approval pending';
     }
     const orders = readOrders(); orders.unshift(order); saveOrders(orders);
     try {
