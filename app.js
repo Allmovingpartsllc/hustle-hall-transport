@@ -41,7 +41,7 @@ const PROMO_CODES = {
   LOCAL5: { type: 'fixed', value: 5, minimumSubtotal: 15, label: '$5 off orders of $15 or more' },
   SCHOOL: { type: 'percent', value: 20, maxDiscount: 5, service: 'ride', allowMultiRide: true, label: '20% off rides, up to $5' }
 };
-const statuses = ['Requested', 'Accepted', 'Rejected', 'Cancelled', 'Driver Assigned', 'Driver En Route', 'Picked Up', 'In Transit', 'Delivered', 'Completed'];
+const statuses = ['Requested', 'Pending Approval', 'Accepted', 'Rejected', 'Cancelled', 'Driver Assigned', 'Driver En Route', 'Picked Up', 'In Transit', 'Delivered', 'Completed'];
 const readOrders = () => JSON.parse(localStorage.getItem(HHT_ORDERS) || '[]');
 const saveOrders = (orders) => localStorage.setItem(HHT_ORDERS, JSON.stringify(orders));
 const money = (value) => `${Number(value || 0).toFixed(2)}`;
@@ -104,6 +104,27 @@ async function startStripeCheckout(order) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok || !data.url) throw new Error(data.error || 'Stripe Checkout could not be started.');
   window.location.assign(data.url);
+}
+
+async function checkRideAvailability(order) {
+  if (order.service === 'package') return { requiresApproval: false, reason: 'Package deliveries may overlap.' };
+  if (order.quotePending) return { requiresApproval: true, reason: 'Multi-day ride requests require approval.' };
+  try {
+    const response = await fetch('/api/check-booking-availability', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Availability could not be checked.');
+    return result;
+  } catch (error) {
+    console.warn('Ride availability check unavailable.', error);
+    return {
+      requiresApproval: true,
+      reason: 'Automatic availability check was unavailable, so this ride needs manual approval.'
+    };
+  }
 }
 
 function calculatePackage(form) {
@@ -243,7 +264,30 @@ document.querySelectorAll('[data-booking-form]').forEach((form) => {
     event.preventDefault();
     const fields = Object.fromEntries(new FormData(form));
     const quote = calculator(form);
-    const order = { id: makeId(), service: form.dataset.service, status: 'Requested', createdAt: new Date().toLocaleString(), accountId: currentUser()?.id || null, ...fields, ...quote, paymentStatus: quote.quotePending ? 'Quote pending' : (fields.paymentMethod === 'Stripe' ? 'Awaiting payment' : 'Pay in Person') };
+    const addressFields = form.querySelectorAll('[data-address]');
+    const [pickupField, deliveryField] = addressFields;
+    const order = {
+      id: makeId(),
+      service: form.dataset.service,
+      status: 'Requested',
+      createdAt: new Date().toLocaleString(),
+      accountId: currentUser()?.id || null,
+      ...fields,
+      ...quote,
+      pickupLat: pickupField?.dataset.lat || '',
+      pickupLon: pickupField?.dataset.lon || '',
+      deliveryLat: deliveryField?.dataset.lat || '',
+      deliveryLon: deliveryField?.dataset.lon || '',
+      paymentStatus: quote.quotePending ? 'Quote pending' : (fields.paymentMethod === 'Stripe' ? 'Awaiting payment' : 'Pay in Person')
+    };
+    if (order.service === 'ride') {
+      const availability = await checkRideAvailability(order);
+      order.availabilityCheck = availability;
+      if (availability.requiresApproval) {
+        order.status = 'Pending Approval';
+        order.paymentStatus = 'Approval pending';
+      }
+    }
     const orders = readOrders(); orders.unshift(order); saveOrders(orders);
     try {
       const client = await hhtSupabaseReady;
@@ -260,7 +304,7 @@ document.querySelectorAll('[data-booking-form]').forEach((form) => {
     try {
       await sendOrderNotification(order);
     } catch (error) { console.warn('Email notification unavailable.', error); }
-    if (order.quotePending) {
+    if (order.quotePending || order.status === 'Pending Approval') {
       window.location.href = `receipt.html?id=${encodeURIComponent(order.id)}`;
       return;
     }
