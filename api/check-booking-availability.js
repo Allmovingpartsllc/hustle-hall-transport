@@ -114,20 +114,11 @@ module.exports = async function handler(req, res) {
       conflicts.push({ id: row.id, nearby });
     }
 
-    const distantConflicts = conflicts.filter((item) => !item.nearby);
-    if (distantConflicts.length) {
-      return res.status(200).json({
-        requiresApproval: true,
-        reason: 'This ride overlaps another passenger ride that is not close enough to combine automatically.',
-        conflicts: distantConflicts.map((item) => item.id)
-      });
-    }
-
     if (conflicts.length) {
       return res.status(200).json({
-        requiresApproval: false,
-        nearbyOverlap: true,
-        reason: 'This ride overlaps another ride, but both pickup and destination areas are within 5 miles.'
+        requiresApproval: true,
+        reason: 'This ride overlaps another active passenger ride and needs manual approval before confirmation or payment.',
+        conflicts: conflicts.map((item) => item.id)
       });
     }
 
