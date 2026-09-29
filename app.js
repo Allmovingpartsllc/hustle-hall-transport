@@ -61,7 +61,7 @@ function calculatePromo(form, subtotal, options = {}) {
     messageText = 'That promo code is not available.';
   } else if (promo?.service && promo.service !== form.dataset.service) {
     messageText = 'This promo applies to rides only.';
-  } else if (isMultiRide && !promo?.allowMultiRide) {
+  } else if (isMultiRide && code && !promo?.allowMultiRide) {
     messageText = 'Only the SCHOOL promo can be applied to a multi-day ride request.';
   } else if (isMultiRide && promo?.allowMultiRide) {
     accepted = true;
