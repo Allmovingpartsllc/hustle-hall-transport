@@ -67,7 +67,7 @@ function calculatePromo(form, subtotal, options = {}) {
     accepted = true;
     pending = true;
     messageText = `${code} saved. ${promo.label} will be applied when your multi-day quote is approved.`;
-  } else if (subtotal < Math.max(PROMO_MINIMUM_SUBTOTAL, promo?.minimumSubtotal || 0)) {
+  } else if (code && subtotal < Math.max(PROMO_MINIMUM_SUBTOTAL, promo?.minimumSubtotal || 0)) {
     messageText = `Promo codes require a minimum order of ${money(Math.max(PROMO_MINIMUM_SUBTOTAL, promo?.minimumSubtotal || 0))} before discounts.`;
   } else if (promo) {
     const rawDiscount = promo.type === 'percent' ? subtotal * (promo.value / 100) : promo.value;
