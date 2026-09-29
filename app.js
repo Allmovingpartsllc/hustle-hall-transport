@@ -243,8 +243,8 @@ function setupMultiRideBooking(form) {
     if (paymentSection) paymentSection.hidden = isMultiRide;
     if (paymentNotice) paymentNotice.hidden = isMultiRide;
     const promoSection = form.querySelector('.promo-section');
-    if (promoSection) promoSection.hidden = isMultiRide;
-    if (form.elements.promoCode) form.elements.promoCode.disabled = isMultiRide;
+    if (promoSection) promoSection.hidden = false;
+    if (form.elements.promoCode) form.elements.promoCode.disabled = false;
     quoteText.textContent = isMultiRide
       ? 'Multi-day requests are reviewed before payment. We will confirm availability, the final schedule, and your custom quote before charging you.'
       : 'No surge pricing. $5 base fare, plus $0.95 per mile for the first 20 miles, $0.85 per mile after 20 miles, and $0.15 per minute. This is an estimate; tolls, added stops, or route changes may change the final total.';
