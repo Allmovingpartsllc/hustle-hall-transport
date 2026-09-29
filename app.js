@@ -262,6 +262,20 @@ document.querySelectorAll('[data-booking-form]').forEach((form) => {
   calculator(form);
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
+    if (form.dataset.submitting === 'true') return;
+    form.dataset.submitting = 'true';
+    const submitButton = form.querySelector('button[type="submit"]');
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.textContent = 'Saving request…';
+    }
+    const unlockBooking = () => {
+      delete form.dataset.submitting;
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.textContent = form.dataset.service === 'package' ? 'Submit delivery request →' : 'Request a ride →';
+      }
+    };
     const fields = Object.fromEntries(new FormData(form));
     const quote = calculator(form);
     const addressFields = form.querySelectorAll('[data-address]');
@@ -299,6 +313,7 @@ document.querySelectorAll('[data-booking-form]').forEach((form) => {
     } catch (error) {
       console.warn('Cloud booking save unavailable.', error);
       window.alert(`We could not save your request. ${error.message || 'Please check your connection and try again.'}`);
+      unlockBooking();
       return;
     }
     try {
