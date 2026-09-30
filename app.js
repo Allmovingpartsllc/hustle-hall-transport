@@ -64,9 +64,14 @@ function calculatePromo(form, subtotal, options = {}) {
   } else if (isMultiRide && code && !promo?.allowMultiRide) {
     messageText = 'Only the SCHOOL promo can be applied to a multi-day ride request.';
   } else if (isMultiRide && promo?.allowMultiRide) {
+    const multiRideCount = Math.max(1, Number(options.multiRideCount || 1));
+    const rawDiscount = subtotal * (promo.value / 100);
+    const perRideCap = promo.maxDiscount || rawDiscount;
+    discount = Math.min(subtotal, rawDiscount, perRideCap * multiRideCount);
     accepted = true;
-    pending = true;
-    messageText = `${code} saved. ${promo.label} will be applied when your multi-day quote is approved.`;
+    messageText = subtotal > 0
+      ? `${code} applied to your pre-approval estimate: ${promo.label} per ride.`
+      : `${code} will be included once your route and service dates are entered.`;
   } else if (code && subtotal < Math.max(PROMO_MINIMUM_SUBTOTAL, promo?.minimumSubtotal || 0)) {
     messageText = `Promo codes require a minimum order of ${money(Math.max(PROMO_MINIMUM_SUBTOTAL, promo?.minimumSubtotal || 0))} before discounts.`;
   } else if (promo) {
@@ -149,12 +154,25 @@ function calculateRide(form) {
     const start = startDate ? new Date(`${startDate}T12:00:00`) : null;
     const end = endDate ? new Date(`${endDate}T12:00:00`) : null;
     const serviceDays = start && end && end >= start ? Math.floor((end - start) / 86400000) + 1 : null;
-    form.querySelector('[data-ride-base]').textContent = 'Custom';
-    form.querySelector('[data-mile-charge]').textContent = 'Schedule based';
-    form.querySelector('[data-minute-charge]').textContent = serviceDays ? `${serviceDays} day${serviceDays === 1 ? '' : 's'}` : 'Select dates';
-    form.querySelector('[data-ride-total]').textContent = 'Quote pending';
-    const promo = calculatePromo(form, 0, { allowPending: true });
-    return { base: 0, minimumFare: 0, miles: 0, minutes: 0, firstTierMiles: 0, longTripMiles: 0, mileCharge: 0, minuteCharge: 0, surcharge: 0, total: 0, quotePending: true, serviceDays, ...promo };
+    const estimatedRideCount = serviceDays ? serviceDays * 2 : 0;
+    const miles = Math.max(0, Number(form.elements.miles?.value || 0));
+    const minutes = Math.max(0, Number(form.elements.minutes?.value || 0));
+    const minimumFare = 5;
+    const base = 5;
+    const firstTierMiles = Math.min(miles, 20);
+    const longTripMiles = Math.max(0, miles - 20);
+    const mileCharge = (firstTierMiles * 0.95) + (longTripMiles * 0.85);
+    const minuteCharge = minutes * 0.15;
+    const perRideEstimate = Math.max(minimumFare, base + mileCharge + minuteCharge);
+    const subtotal = estimatedRideCount ? perRideEstimate * estimatedRideCount : 0;
+    const promo = calculatePromo(form, subtotal, { multiRideCount: estimatedRideCount });
+    const total = Math.max(0, subtotal - promo.promoDiscount);
+    form.querySelector('[data-ride-base]').textContent = money(base);
+    form.querySelector('[data-mile-charge]').textContent = `${money(mileCharge)} / ride`;
+    form.querySelector('[data-minute-charge]').textContent = estimatedRideCount ? `${estimatedRideCount} rides (${serviceDays} days)` : 'Select service dates';
+    form.querySelector('[data-ride-total]').textContent = estimatedRideCount ? money(total) : 'Select dates';
+    form.querySelector('.quote-total span')?.replaceChildren('Pre-approval estimate');
+    return { base, minimumFare, miles, minutes, firstTierMiles, longTripMiles, mileCharge, minuteCharge, perRideEstimate, estimatedRideCount, surcharge: 0, subtotal, total, quotePending: true, preApprovalEstimate: true, serviceDays, ...promo };
   }
   const miles = Math.max(0, Number(form.elements.miles?.value || 0));
   const minutes = Math.max(0, Number(form.elements.minutes?.value || 0));
@@ -171,7 +189,8 @@ function calculateRide(form) {
   form.querySelector('[data-mile-charge]').textContent = money(mileCharge);
   form.querySelector('[data-minute-charge]').textContent = money(minuteCharge);
   form.querySelector('[data-ride-total]').textContent = money(total);
-  return { base, minimumFare, miles, minutes, firstTierMiles, longTripMiles, mileCharge, minuteCharge, surcharge: 0, subtotal, total, quotePending: false, ...promo };
+  form.querySelector('.quote-total span')?.replaceChildren('Estimated fare');
+  return { base, minimumFare, miles, minutes, firstTierMiles, longTripMiles, mileCharge, minuteCharge, surcharge: 0, subtotal, total, quotePending: false, preApprovalEstimate: false, ...promo };
 }
 
 function addSchedulingFields() {
@@ -235,17 +254,18 @@ function setupMultiRideBooking(form) {
       field.required = isMultiRide;
     });
     [distanceLabel, timeLabel, routeTools, routeMap].filter(Boolean).forEach((element) => {
-      element.hidden = isMultiRide;
+      element.hidden = false;
     });
-    if (form.elements.miles) form.elements.miles.disabled = isMultiRide;
-    if (form.elements.minutes) form.elements.minutes.disabled = isMultiRide;
+    if (form.elements.miles) form.elements.miles.disabled = false;
+    if (form.elements.minutes) form.elements.minutes.disabled = false;
     if (paymentSection) paymentSection.hidden = isMultiRide;
     if (paymentNotice) paymentNotice.hidden = isMultiRide;
     const promoSection = form.querySelector('.promo-section');
     if (promoSection) promoSection.hidden = false;
     if (form.elements.promoCode) form.elements.promoCode.disabled = false;
+    form.querySelector('.quote-total span')?.replaceChildren(isMultiRide ? 'Pre-approval estimate' : 'Estimated fare');
     quoteText.textContent = isMultiRide
-      ? 'Multi-day requests are reviewed before payment. We will confirm availability, the final schedule, and your custom quote before charging you.'
+      ? 'Your pre-approval estimate assumes one pickup ride and one return ride each service day. We will confirm availability and the final schedule before payment; route changes, added stops, tolls, or schedule changes may change the final price.'
       : 'No surge pricing. $5 base fare, plus $0.95 per mile for the first 20 miles, $0.85 per mile after 20 miles, and $0.15 per minute. This is an estimate; tolls, added stops, or route changes may change the final total.';
     calculateRide(form);
   };
@@ -340,7 +360,7 @@ const trackingForm = document.querySelector('[data-tracking-form]');
 if (trackingForm) trackingForm.addEventListener('submit', (event) => { event.preventDefault(); const q = new FormData(trackingForm).get('lookup').trim().toLowerCase(); const matches = readOrders().filter(o => o.id.toLowerCase() === q || o.phone.replace(/\D/g, '') === q.replace(/\D/g, '')); const result = document.querySelector('[data-tracking-result]'); result.innerHTML = matches.length ? matches.map(o => `<article class="result-card"><h2>${o.id}</h2>${orderDetails(o)}<a class="button button-secondary" href="receipt.html?id=${encodeURIComponent(o.id)}">View receipt</a></article>`).join('') : '<p>No order was found. Check the receipt number or phone number and try again.</p>'; });
 
 const receipt = document.querySelector('[data-receipt]');
-if (receipt) { const id = new URLSearchParams(location.search).get('id'); const order = readOrders().find(o => o.id === id); receipt.innerHTML = order ? `<p class="eyebrow">Hustle Hall Transport</p><h1>Digital receipt</h1><p class="receipt-id">${order.id}</p><p>Created ${order.createdAt}</p><hr>${orderDetails(order)}<hr>${order.service === 'package' ? `<div class="receipt-row"><span>${order.size} package</span><strong>${money(order.base)}</strong></div><div class="receipt-row"><span>Distance surcharge</span><strong>${money(order.surcharge)}</strong></div><div class="receipt-row"><span>Distance</span><strong>${order.miles} miles</strong></div><div class="receipt-row receipt-total"><span>Total</span><strong>${money(order.total)}</strong></div>` : order.quotePending ? `<div class="receipt-row"><span>Booking type</span><strong>Multi-day ride request</strong></div><div class="receipt-row"><span>Service dates</span><strong>${order.startDate || 'To be confirmed'} to ${order.endDate || 'To be confirmed'}</strong></div><div class="receipt-row receipt-total"><span>Custom quote</span><strong>Pending review</strong></div>` : `<div class="receipt-row"><span>Base fare</span><strong>${money(order.base)}</strong></div><div class="receipt-row"><span>Mileage (${order.miles} miles)</span><strong>${money(order.mileCharge)}</strong></div><div class="receipt-row"><span>Time (${order.minutes} minutes)</span><strong>${money(order.minuteCharge)}</strong></div><div class="receipt-row receipt-total"><span>Total</span><strong>${money(order.total)}</strong></div>`}<hr><p><strong>Hustle Hard. Deliver Smart.</strong><br>239-800-1380<br>Powered by ALLMOVINGPARTS LLC</p>` : '<h1>Receipt not found</h1><p>This receipt is not available in this browser.</p>'; }
+if (receipt) { const id = new URLSearchParams(location.search).get('id'); const order = readOrders().find(o => o.id === id); receipt.innerHTML = order ? `<p class="eyebrow">Hustle Hall Transport</p><h1>Digital receipt</h1><p class="receipt-id">${order.id}</p><p>Created ${order.createdAt}</p><hr>${orderDetails(order)}<hr>${order.service === 'package' ? `<div class="receipt-row"><span>${order.size} package</span><strong>${money(order.base)}</strong></div><div class="receipt-row"><span>Distance surcharge</span><strong>${money(order.surcharge)}</strong></div><div class="receipt-row"><span>Distance</span><strong>${order.miles} miles</strong></div><div class="receipt-row receipt-total"><span>Total</span><strong>${money(order.total)}</strong></div>` : order.quotePending ? `<div class="receipt-row"><span>Booking type</span><strong>Multi-day ride request</strong></div><div class="receipt-row"><span>Service dates</span><strong>${order.startDate || 'To be confirmed'} to ${order.endDate || 'To be confirmed'}</strong></div><div class="receipt-row"><span>Estimated rides</span><strong>${order.estimatedRideCount || 'To be confirmed'}</strong></div><div class="receipt-row"><span>Per-ride estimate</span><strong>${order.perRideEstimate ? money(order.perRideEstimate) : 'To be confirmed'}</strong></div>${order.promoCode ? `<div class="receipt-row"><span>Promo discount</span><strong>-${money(order.promoDiscount)}</strong></div>` : ''}<div class="receipt-row receipt-total"><span>Pre-approval estimate</span><strong>${order.total ? money(order.total) : 'To be confirmed'}</strong></div><p>This estimate is not a final charge. Availability, route changes, added stops, tolls, and schedule changes may affect the approved price.</p>` : `<div class="receipt-row"><span>Base fare</span><strong>${money(order.base)}</strong></div><div class="receipt-row"><span>Mileage (${order.miles} miles)</span><strong>${money(order.mileCharge)}</strong></div><div class="receipt-row"><span>Time (${order.minutes} minutes)</span><strong>${money(order.minuteCharge)}</strong></div><div class="receipt-row receipt-total"><span>Total</span><strong>${money(order.total)}</strong></div>`}<hr><p><strong>Hustle Hard. Deliver Smart.</strong><br>239-800-1380<br>Powered by ALLMOVINGPARTS LLC</p>` : '<h1>Receipt not found</h1><p>This receipt is not available in this browser.</p>'; }
 
 function requestStatusNote(status) {
   return new Promise((resolve) => {
@@ -363,7 +383,7 @@ function requestStatusNote(status) {
   });
 }
 
-function renderAdmin() { const orders = readOrders(); const body = document.querySelector('[data-admin-orders]'); if (!body) return; const delivered = orders.filter(o => ['Delivered','Completed'].includes(o.status)); document.querySelector('[data-admin-stats]').innerHTML = `<article class="stat-card"><span>Total requests</span><strong>${orders.length}</strong></article><article class="stat-card"><span>Active requests</span><strong>${orders.filter(o => !['Delivered','Completed','Rejected','Cancelled'].includes(o.status)).length}</strong></article><article class="stat-card"><span>Delivered revenue</span><strong>${money(delivered.reduce((sum,o) => sum + Number(o.total || 0), 0))}</strong></article>`; body.innerHTML = orders.length ? orders.map(o => `<tr><td><a href="receipt.html?id=${encodeURIComponent(o.id)}">${o.id}</a></td><td>${o.customerName}<br><small>${o.phone}</small></td><td>${o.service}</td><td>${o.total ? money(o.total) : 'TBD'}</td><td><select data-status="${o.id}">${statuses.map(s => `<option ${s === o.status ? 'selected' : ''}>${s}</option>`).join('')}</select></td><td><a href="receipt.html?id=${encodeURIComponent(o.id)}">Receipt</a><small class="order-request-time">Received: ${escapePortalText(o.createdAt || 'Not available')}</small><small class="order-completed-time">Completed: ${escapePortalText(o.completedAt || 'Not completed')}</small></td></tr>`).join('') : '<tr><td colspan="6">No requests yet.</td></tr>'; body.querySelectorAll('[data-status]').forEach(el => el.addEventListener('change', async () => { const nextStatus = el.value; const list=readOrders(); const item=list.find(o=>o.id===el.dataset.status); const needsNote = ['Rejected', 'Cancelled'].includes(nextStatus); const note = needsNote ? await requestStatusNote(nextStatus) : ''; if (needsNote && !note) { el.value = item?.status || 'Requested'; return; } if (item) { item.status=nextStatus; if (needsNote) { item.cancellationNote = note; item.cancelledBy = 'Admin'; item.cancelledAt = new Date().toLocaleString(); } if (['Delivered', 'Completed'].includes(nextStatus) && !item.completedAt) item.completedAt = new Date().toLocaleString(); saveOrders(list); } try { const client = await hhtSupabaseReady; const { error } = await client.from('orders').update({ status: nextStatus, payload: item }).eq('id', el.dataset.status); if (error) throw error; } catch (error) { console.warn('Cloud status update unavailable.', error); } if (item) sendOrderNotification(item, 'status_update').catch((error) => console.warn('Status notification unavailable.', error)); renderAdmin(); })); }
+function renderAdmin() { const orders = readOrders(); const body = document.querySelector('[data-admin-orders]'); if (!body) return; const delivered = orders.filter(o => ['Delivered','Completed'].includes(o.status)); document.querySelector('[data-admin-stats]').innerHTML = `<article class="stat-card"><span>Total requests</span><strong>${orders.length}</strong></article><article class="stat-card"><span>Active requests</span><strong>${orders.filter(o => !['Delivered','Completed','Rejected','Cancelled'].includes(o.status)).length}</strong></article><article class="stat-card"><span>Delivered revenue</span><strong>${money(delivered.reduce((sum,o) => sum + Number(o.total || 0), 0))}</strong></article>`; body.innerHTML = orders.length ? orders.map(o => `<tr><td><a href="receipt.html?id=${encodeURIComponent(o.id)}">${o.id}</a></td><td>${o.customerName}<br><small>${o.phone}</small></td><td>${o.service}</td><td>${o.preApprovalEstimate ? `Est. ${money(o.total)}` : (o.total ? money(o.total) : 'TBD')}</td><td><select data-status="${o.id}">${statuses.map(s => `<option ${s === o.status ? 'selected' : ''}>${s}</option>`).join('')}</select></td><td><a href="receipt.html?id=${encodeURIComponent(o.id)}">Receipt</a><small class="order-request-time">Received: ${escapePortalText(o.createdAt || 'Not available')}</small><small class="order-completed-time">Completed: ${escapePortalText(o.completedAt || 'Not completed')}</small></td></tr>`).join('') : '<tr><td colspan="6">No requests yet.</td></tr>'; body.querySelectorAll('[data-status]').forEach(el => el.addEventListener('change', async () => { const nextStatus = el.value; const list=readOrders(); const item=list.find(o=>o.id===el.dataset.status); const needsNote = ['Rejected', 'Cancelled'].includes(nextStatus); const note = needsNote ? await requestStatusNote(nextStatus) : ''; if (needsNote && !note) { el.value = item?.status || 'Requested'; return; } if (item) { item.status=nextStatus; if (needsNote) { item.cancellationNote = note; item.cancelledBy = 'Admin'; item.cancelledAt = new Date().toLocaleString(); } if (['Delivered', 'Completed'].includes(nextStatus) && !item.completedAt) item.completedAt = new Date().toLocaleString(); saveOrders(list); } try { const client = await hhtSupabaseReady; const { error } = await client.from('orders').update({ status: nextStatus, payload: item }).eq('id', el.dataset.status); if (error) throw error; } catch (error) { console.warn('Cloud status update unavailable.', error); } if (item) sendOrderNotification(item, 'status_update').catch((error) => console.warn('Status notification unavailable.', error)); renderAdmin(); })); }
 renderAdmin();
 function openAdminOrderDetails(order) {
   const mapsLink = (address) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address || '')}`;
@@ -397,7 +417,7 @@ function openAdminOrderDetails(order) {
     ['Pickup time', order.time || 'Not specified'],
     ['Preferred drop-off time', order.dropoffTime || 'Not specified'],
     ['Distance', order.miles ? `${order.miles} miles` : 'Not calculated'],
-    ['Estimated total', money(order.total)]
+    [order.preApprovalEstimate ? 'Pre-approval estimate' : 'Estimated total', money(order.total)]
   ];
   if (order.cancellationNote) fields.splice(3, 0, ['Cancellation/rejection note', order.cancellationNote], ['Updated by', order.cancelledBy || 'Not specified'], ['Update time', order.cancelledAt || 'Not available']);
   if (order.service === 'package') fields.splice(8, 0, ['Recipient', order.recipient || 'Not provided'], ['Recipient phone', order.recipientPhone || 'Not provided'], ['Package size', order.size || order.packageSize || 'Not specified'], ['Package description', order.description || 'Not provided']);
