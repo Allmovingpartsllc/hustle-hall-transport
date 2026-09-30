@@ -25,7 +25,7 @@ function details(order) {
     ['Requested time', order.time || 'Not specified'],
     ['Preferred drop-off time', order.dropoffTime || 'Not specified'],
     ['Distance', order.miles ? `${order.miles} miles` : 'To be confirmed'],
-    ['Estimated total', Number.isFinite(Number(order.total)) ? `$${Number(order.total).toFixed(2)}` : 'To be confirmed']
+    [order.preApprovalEstimate ? 'Pre-approval estimate' : 'Estimated total', Number.isFinite(Number(order.total)) ? `${Number(order.total).toFixed(2)}` : 'To be confirmed']
   ];
   if (order.service === 'package') rows.splice(8, 0, ['Package', order.size || order.packageSize || 'Not specified']);
   if (order.deliveryProof?.deliveredAt) rows.push(['Delivered at', order.deliveryProof.deliveredAt], ['Received by', order.deliveryProof.signedBy || 'Not recorded']);
