@@ -19,3 +19,115 @@ function exportOperations(){const headers=['Source','Booking ID','Customer','Pho
 document.addEventListener('click',(event)=>{if(event.target.matches('[data-save]'))saveRow(event.target);if(event.target.matches('[data-delete]'))deleteRow(event.target);if(event.target.matches('[data-refresh]'))loadOperations();if(event.target.matches('[data-export-ops]'))exportOperations();});
 document.addEventListener('input',(event)=>{if(event.target.matches('[data-filter-source],[data-filter-status],[data-filter-search]'))render();});
 loadOperations();
+
+
+const BUSINESS_FILES_BUCKET = 'business-files';
+const BUSINESS_FILES_FOLDER = 'reports';
+const businessFilesMessage = q('[data-business-files-message]');
+const businessFilesList = q('[data-business-files-list]');
+
+function fileSize(bytes) {
+  const value = Number(bytes || 0);
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function safeFileName(name) {
+  return String(name || 'report').replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+async function loadBusinessFiles() {
+  if (!businessFilesMessage || !businessFilesList) return;
+  businessFilesMessage.classList.remove('is-error');
+  businessFilesMessage.textContent = 'Loading private files…';
+  try {
+    const client = await hhtSupabaseReady;
+    const { data: { user } } = await client.auth.getUser();
+    if (!user) throw new Error('Please log in again.');
+    const { data, error } = await client.storage.from(BUSINESS_FILES_BUCKET).list(BUSINESS_FILES_FOLDER, {
+      limit: 100,
+      offset: 0,
+      sortBy: { column: 'created_at', order: 'desc' }
+    });
+    if (error) throw error;
+    const files = (data || []).filter((file) => file.name);
+    businessFilesMessage.textContent = files.length ? `${files.length} private file${files.length === 1 ? '' : 's'} available.` : 'No business files have been uploaded yet.';
+    businessFilesList.innerHTML = files.length ? files.map((file) => {
+      const fullPath = `${BUSINESS_FILES_FOLDER}/${file.name}`;
+      const created = file.created_at ? new Date(file.created_at).toLocaleString() : 'Date unavailable';
+      return `<article class="business-file"><div><strong>${clean(file.metadata?.label || file.name)}</strong><small>${clean(created)} · ${clean(fileSize(file.metadata?.size))}</small></div><button type="button" class="button button-secondary" data-open-business-file="${clean(fullPath)}">Open</button></article>`;
+    }).join('') : '';
+  } catch (error) {
+    businessFilesList.innerHTML = '';
+    businessFilesMessage.classList.add('is-error');
+    businessFilesMessage.textContent = 'The private file library is not connected yet. Complete the one-time storage setup before uploading reports.';
+    console.warn('Business files unavailable.', error);
+  }
+}
+
+async function uploadBusinessFile() {
+  const input = q('[data-business-file]');
+  const label = q('[data-business-file-label]');
+  const button = q('[data-upload-business-file]');
+  const file = input?.files?.[0];
+  if (!file) {
+    businessFilesMessage.textContent = 'Choose a file to upload first.';
+    businessFilesMessage.classList.add('is-error');
+    return;
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    businessFilesMessage.textContent = 'Choose a file smaller than 10 MB.';
+    businessFilesMessage.classList.add('is-error');
+    return;
+  }
+  button.disabled = true;
+  button.textContent = 'Uploading…';
+  businessFilesMessage.classList.remove('is-error');
+  businessFilesMessage.textContent = 'Uploading your private file…';
+  try {
+    const client = await hhtSupabaseReady;
+    const { data: { user } } = await client.auth.getUser();
+    if (!user) throw new Error('Please log in again.');
+    const datedName = `${new Date().toISOString().slice(0, 10)}-${Date.now()}-${safeFileName(file.name)}`;
+    const path = `${BUSINESS_FILES_FOLDER}/${datedName}`;
+    const { error } = await client.storage.from(BUSINESS_FILES_BUCKET).upload(path, file, {
+      cacheControl: '3600',
+      contentType: file.type || 'application/octet-stream',
+      upsert: false,
+      metadata: { label: String(label?.value || '').trim() }
+    });
+    if (error) throw error;
+    input.value = '';
+    if (label) label.value = '';
+    await loadBusinessFiles();
+  } catch (error) {
+    businessFilesMessage.classList.add('is-error');
+    businessFilesMessage.textContent = error.message || 'The file could not be uploaded.';
+    console.warn('Business file upload failed.', error);
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Upload file';
+  }
+}
+
+async function openBusinessFile(path) {
+  try {
+    const client = await hhtSupabaseReady;
+    const { data, error } = await client.storage.from(BUSINESS_FILES_BUCKET).createSignedUrl(path, 60);
+    if (error) throw error;
+    window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+  } catch (error) {
+    businessFilesMessage.classList.add('is-error');
+    businessFilesMessage.textContent = 'This file could not be opened. Please refresh and try again.';
+    console.warn('Business file open failed.', error);
+  }
+}
+
+document.addEventListener('click', (event) => {
+  if (event.target.matches('[data-upload-business-file]')) uploadBusinessFile();
+  const fileButton = event.target.closest('[data-open-business-file]');
+  if (fileButton) openBusinessFile(fileButton.dataset.openBusinessFile);
+});
+
+loadBusinessFiles();
