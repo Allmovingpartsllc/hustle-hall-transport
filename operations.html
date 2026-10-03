@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>AllMovingParts Operations</title>
-  <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="operations.css">
-  <script src="app.js" defer></script>
-  <script src="operations.js" defer></script>
+  <link rel="stylesheet" href="style.css?v=school30-1">
+  <link rel="stylesheet" href="operations.css?v=business-files-1">
+  <script src="app.js?v=school30-1" defer></script>
+  <script src="operations.js?v=business-files-1" defer></script>
 </head>
 <body class="ops-body">
   <header class="site-header">
@@ -24,6 +24,16 @@
       </div>
       <p class="ops-message" data-ops-message>Connecting to the secure booking database…</p>
       <section class="ops-stats" data-ops-stats aria-label="Business totals"></section>
+      <section class="business-files" aria-labelledby="business-files-title">
+        <div class="business-files-heading"><div><p class="eyebrow">Private records</p><h2 id="business-files-title">Business files & reports</h2><p>Upload reports, invoices, permits, photos, and other business records. Files are visible only to authorized admins.</p></div></div>
+        <div class="business-files-upload">
+          <label>Choose file<input type="file" data-business-file accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg"></label>
+          <label>File label (optional)<input type="text" data-business-file-label maxlength="90" placeholder="Example: September fuel report"></label>
+          <button class="button button-primary" type="button" data-upload-business-file>Upload file</button>
+        </div>
+        <p class="business-files-message" data-business-files-message aria-live="polite">Loading private files…</p>
+        <div class="business-files-list" data-business-files-list></div>
+      </section>
       <section class="ops-filters" aria-label="Filters">
         <label>Business<select data-filter-source><option value="">Both businesses</option><option value="HustleHall">HustleHall</option><option value="BuildIt">BuildIt</option></select></label>
         <label>Status<select data-filter-status><option value="">Every status</option></select></label>
