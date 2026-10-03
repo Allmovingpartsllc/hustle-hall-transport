@@ -112,12 +112,15 @@ async function uploadBusinessFile() {
 }
 
 async function openBusinessFile(path) {
+  const reportWindow = window.open('', '_blank', 'noopener,noreferrer');
   try {
     const client = await hhtSupabaseReady;
     const { data, error } = await client.storage.from(BUSINESS_FILES_BUCKET).createSignedUrl(path, 60);
     if (error) throw error;
-    window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+    if (reportWindow) reportWindow.location.href = data.signedUrl;
+    else window.location.assign(data.signedUrl);
   } catch (error) {
+    reportWindow?.close();
     businessFilesMessage.classList.add('is-error');
     businessFilesMessage.textContent = 'This file could not be opened. Please refresh and try again.';
     console.warn('Business file open failed.', error);
