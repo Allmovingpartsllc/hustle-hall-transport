@@ -64,7 +64,7 @@ function calculatePromo(form, subtotal, options = {}) {
     messageText = 'This promo applies to rides only.';
   } else if (isMultiRide && code && !promo?.allowMultiRide) {
     messageText = 'Only the SCHOOL promo can be applied to a multi-day ride request.';
-  } else if (isMultiRide && promo?.allowMultiRide) {
+  } else if (isMultiRide && promo?.allowMultiRide && subtotal >= Math.max(PROMO_MINIMUM_SUBTOTAL, promo?.minimumSubtotal || 0)) {
     const multiRideCount = Math.max(1, Number(options.multiRideCount || 1));
     const rawDiscount = subtotal * (promo.value / 100);
     const perRideCap = promo.maxDiscount || rawDiscount;
