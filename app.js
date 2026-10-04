@@ -40,7 +40,7 @@ const PROMO_CODES = {
   WELCOME10: { type: 'percent', value: 10, maxDiscount: 5, label: '10% off, up to $5' },
   LOCAL5: { type: 'fixed', value: 5, minimumSubtotal: 15, label: '$5 off orders of $15 or more' },
   SCHOOL: { type: 'percent', value: 30, maxDiscount: 5, service: 'ride', allowMultiRide: true, label: '30% off rides, up to $5 per ride' },
-  TKA: { type: 'percent', value: 30, allowMultiRide: true, label: '30% off eligible orders, including multi-day rides' }
+  TKA: { type: 'percent', value: 45, allowMultiRide: true, label: '45% off eligible orders, including multi-day rides' }
 };
 const statuses = ['Requested', 'Pending Approval', 'Accepted', 'Rejected', 'Cancelled', 'Driver Assigned', 'Driver En Route', 'Picked Up', 'In Transit', 'Delivered', 'Completed'];
 const readOrders = () => JSON.parse(localStorage.getItem(HHT_ORDERS) || '[]');
