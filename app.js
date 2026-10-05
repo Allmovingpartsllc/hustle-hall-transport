@@ -71,7 +71,7 @@ function calculatePromo(form, subtotal, options = {}) {
     discount = Math.min(subtotal, rawDiscount, perRideCap * multiRideCount);
     accepted = true;
     messageText = subtotal > 0
-      ? `${code} applied to your pre-approval estimate: ${promo.label} per ride.`
+      ? `${code} applied to your pre-approval estimate: ${promo.label}.`
       : `${code} will be included once your route and service dates are entered.`;
   } else if (code && subtotal < Math.max(PROMO_MINIMUM_SUBTOTAL, promo?.minimumSubtotal || 0)) {
     messageText = `Promo codes require a minimum order of ${money(Math.max(PROMO_MINIMUM_SUBTOTAL, promo?.minimumSubtotal || 0))} before discounts.`;
