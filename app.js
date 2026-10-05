@@ -848,3 +848,177 @@ if (packageSizeSelect && !document.querySelector('.package-size-guide')) {
   detailsSection?.insertAdjacentHTML('beforebegin', '<aside class="package-size-guide package-guide-card"><p class="eyebrow">Choose the right size</p><h2>Package size guide</h2><div><span><b>Small - $5</b>All small food deliveries, documents, medications, and other hand-sized items.</span><span><b>Medium - $10</b>Grocery bags, shoeboxes, retail purchases, and medium boxes.</span><span><b>Large - $20</b>Large boxes, multiple bags, and bulky items that fit safely in a standard vehicle.</span><span><b>Extra Large - from $50</b>Appliances, furniture, and other oversized items.</span></div></aside>');
 }
 
+
+
+/* Hustle Hall customer reviews */
+function escapeReviewHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+  }[char]));
+}
+
+function reviewStars(rating) {
+  const safeRating = Math.max(1, Math.min(5, Number(rating) || 0));
+  return `<span class="review-stars" aria-label="${safeRating} out of 5 stars">${'★'.repeat(safeRating)}${'☆'.repeat(5 - safeRating)}</span>`;
+}
+
+function reviewDate(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+async function loadPublicReviews() {
+  const target = document.querySelector('[data-public-reviews]');
+  if (!target) return;
+  try {
+    const client = await hhtSupabaseReady;
+    const { data, error } = await client
+      .from('reviews')
+      .select('id,customer_name,rating,service,review_text,recommend,created_at')
+      .eq('status', 'approved')
+      .order('created_at', { ascending: false })
+      .limit(24);
+    if (error) throw error;
+    if (!data?.length) {
+      target.innerHTML = '<div class="review-empty"><h3>No published reviews yet.</h3><p>Be the first customer to share your experience with Hustle Hall.</p></div>';
+      return;
+    }
+    target.innerHTML = data.map((review) => `
+      <article class="customer-review-card">
+        ${reviewStars(review.rating)}
+        <blockquote>“${escapeReviewHtml(review.review_text)}”</blockquote>
+        <div class="review-meta">
+          <strong>${escapeReviewHtml(review.customer_name || 'Hustle Hall Customer')}</strong>
+          <span>${escapeReviewHtml(review.service)}${reviewDate(review.created_at) ? ' · ' + escapeReviewHtml(reviewDate(review.created_at)) : ''}</span>
+          ${review.recommend ? '<small>Would recommend Hustle Hall</small>' : ''}
+        </div>
+      </article>
+    `).join('');
+  } catch (error) {
+    console.warn('Public reviews unavailable.', error);
+    target.innerHTML = '<div class="review-empty"><h3>Reviews are coming soon.</h3><p>You can still use the form to share your feedback.</p></div>';
+  }
+}
+
+const reviewForm = document.querySelector('[data-review-form]');
+if (reviewForm) {
+  reviewForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const message = reviewForm.querySelector('[data-review-message]');
+    const submit = reviewForm.querySelector('[type="submit"]');
+    const data = Object.fromEntries(new FormData(reviewForm));
+    if (data.company) return;
+    const rating = Number(data.rating);
+    const reviewText = String(data.review_text || '').trim();
+    const customerName = String(data.customer_name || '').trim();
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+      message.textContent = 'Please choose a star rating.';
+      message.classList.remove('is-success');
+      return;
+    }
+    if (reviewText.length < 10 || reviewText.length > 1200) {
+      message.textContent = 'Please enter a review between 10 and 1,200 characters.';
+      message.classList.remove('is-success');
+      return;
+    }
+    submit.disabled = true;
+    submit.textContent = 'Submitting…';
+    message.textContent = '';
+    message.classList.remove('is-success');
+    try {
+      const client = await hhtSupabaseReady;
+      const { error } = await client.from('reviews').insert({
+        customer_name: customerName || null,
+        rating,
+        service: String(data.service || ''),
+        review_text: reviewText,
+        recommend: data.recommend === 'yes',
+        status: 'pending'
+      });
+      if (error) throw error;
+      reviewForm.reset();
+      message.textContent = 'Thank you for riding with Hustle Hall! Your review was submitted and will appear after approval.';
+      message.classList.add('is-success');
+    } catch (error) {
+      console.warn('Review submission unavailable.', error);
+      message.textContent = 'We could not submit your review right now. Please try again shortly.';
+    } finally {
+      submit.disabled = false;
+      submit.textContent = 'Submit Review';
+    }
+  });
+}
+
+async function loadAdminReviews() {
+  const body = document.querySelector('[data-admin-reviews]');
+  if (!body) return;
+  const message = document.querySelector('[data-admin-review-message]');
+  try {
+    const client = await hhtSupabaseReady;
+    const { data: authData } = await client.auth.getUser();
+    if (!authData?.user) {
+      body.innerHTML = '<tr><td colspan="6">Sign in as an administrator to manage reviews.</td></tr>';
+      return;
+    }
+    const { data, error } = await client.from('reviews').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    body.innerHTML = data?.length ? data.map((review) => `
+      <tr>
+        <td>${escapeReviewHtml(review.customer_name || 'Anonymous')}<br><small>${escapeReviewHtml(reviewDate(review.created_at))}</small></td>
+        <td>${reviewStars(review.rating)}</td>
+        <td>${escapeReviewHtml(review.service)}</td>
+        <td class="admin-review-copy">${escapeReviewHtml(review.review_text)}</td>
+        <td><span class="review-status review-status-${escapeReviewHtml(review.status)}">${escapeReviewHtml(review.status)}</span></td>
+        <td><div class="review-admin-actions">
+          <button class="button button-small" type="button" data-review-action="approved" data-review-id="${review.id}" ${review.status === 'approved' ? 'disabled' : ''}>Approve</button>
+          <button class="button button-small button-secondary" type="button" data-review-action="hidden" data-review-id="${review.id}" ${review.status === 'hidden' ? 'disabled' : ''}>Hide</button>
+          <button class="review-delete-button" type="button" data-review-action="delete" data-review-id="${review.id}">Delete</button>
+        </div></td>
+      </tr>
+    `).join('') : '<tr><td colspan="6">No customer reviews yet.</td></tr>';
+    body.querySelectorAll('[data-review-action]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const id = button.dataset.reviewId;
+        const action = button.dataset.reviewAction;
+        button.disabled = true;
+        if (message) message.textContent = '';
+        try {
+          let result;
+          if (action === 'delete') {
+            if (!window.confirm('Delete this review permanently?')) { button.disabled = false; return; }
+            result = await client.from('reviews').delete().eq('id', id);
+          } else {
+            result = await client.from('reviews').update({
+              status: action,
+              moderated_at: new Date().toISOString(),
+              moderated_by: authData.user.id
+            }).eq('id', id);
+          }
+          if (result.error) throw result.error;
+          if (message) {
+            message.textContent = action === 'delete' ? 'Review deleted.' : `Review marked ${action}.`;
+            message.classList.add('is-success');
+          }
+          await loadAdminReviews();
+        } catch (error) {
+          console.warn('Review moderation unavailable.', error);
+          if (message) {
+            message.textContent = 'That review could not be updated. Please check your admin access and try again.';
+            message.classList.remove('is-success');
+          }
+          button.disabled = false;
+        }
+      });
+    });
+  } catch (error) {
+    console.warn('Admin reviews unavailable.', error);
+    body.innerHTML = '<tr><td colspan="6">Review moderation is unavailable until the reviews database setup is active.</td></tr>';
+  }
+}
+
+const refreshReviewsButton = document.querySelector('[data-refresh-reviews]');
+if (refreshReviewsButton) refreshReviewsButton.addEventListener('click', loadAdminReviews);
+loadPublicReviews();
+if (document.querySelector('[data-admin-reviews]')) window.setTimeout(loadAdminReviews, 800);
