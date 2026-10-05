@@ -384,8 +384,56 @@ function requestStatusNote(status) {
   });
 }
 
-function renderAdmin() { const orders = readOrders(); const body = document.querySelector('[data-admin-orders]'); if (!body) return; const delivered = orders.filter(o => ['Delivered','Completed'].includes(o.status)); document.querySelector('[data-admin-stats]').innerHTML = `<article class="stat-card"><span>Total requests</span><strong>${orders.length}</strong></article><article class="stat-card"><span>Active requests</span><strong>${orders.filter(o => !['Delivered','Completed','Rejected','Cancelled'].includes(o.status)).length}</strong></article><article class="stat-card"><span>Delivered revenue</span><strong>${money(delivered.reduce((sum,o) => sum + Number(o.total || 0), 0))}</strong></article>`; body.innerHTML = orders.length ? orders.map(o => `<tr><td><a href="receipt.html?id=${encodeURIComponent(o.id)}">${o.id}</a></td><td>${o.customerName}<br><small>${o.phone}</small></td><td>${o.service}</td><td>${o.preApprovalEstimate ? `Est. ${money(o.total)}` : (o.total ? money(o.total) : 'TBD')}</td><td><select data-status="${o.id}">${statuses.map(s => `<option ${s === o.status ? 'selected' : ''}>${s}</option>`).join('')}</select></td><td><a href="receipt.html?id=${encodeURIComponent(o.id)}">Receipt</a><small class="order-request-time">Received: ${escapePortalText(o.createdAt || 'Not available')}</small><small class="order-completed-time">Completed: ${escapePortalText(o.completedAt || 'Not completed')}</small></td></tr>`).join('') : '<tr><td colspan="6">No requests yet.</td></tr>'; body.querySelectorAll('[data-status]').forEach(el => el.addEventListener('change', async () => { const nextStatus = el.value; const list=readOrders(); const item=list.find(o=>o.id===el.dataset.status); const needsNote = ['Rejected', 'Cancelled'].includes(nextStatus); const note = needsNote ? await requestStatusNote(nextStatus) : ''; if (needsNote && !note) { el.value = item?.status || 'Requested'; return; } if (item) { item.status=nextStatus; if (needsNote) { item.cancellationNote = note; item.cancelledBy = 'Admin'; item.cancelledAt = new Date().toLocaleString(); } if (['Delivered', 'Completed'].includes(nextStatus) && !item.completedAt) item.completedAt = new Date().toLocaleString(); saveOrders(list); } try { const client = await hhtSupabaseReady; const { error } = await client.from('orders').update({ status: nextStatus, payload: item }).eq('id', el.dataset.status); if (error) throw error; } catch (error) { console.warn('Cloud status update unavailable.', error); } if (item) sendOrderNotification(item, 'status_update').catch((error) => console.warn('Status notification unavailable.', error)); renderAdmin(); })); }
+function getAdminFilteredOrders(orders) {
+  const filter = document.querySelector('[data-admin-filter]')?.value || 'all';
+  const today = new Date().toDateString();
+  if (filter === 'active') return orders.filter((order) => !['Delivered', 'Completed', 'Rejected', 'Cancelled'].includes(order.status));
+  if (filter === 'pending') return orders.filter((order) => ['Requested', 'Pending Approval'].includes(order.status));
+  if (filter === 'today') return orders.filter((order) => new Date(order.createdAt).toDateString() === today);
+  if (filter === 'multi') return orders.filter((order) => order.rideType === 'multi' || order.preApprovalEstimate);
+  if (filter === 'paid') return orders.filter((order) => order.paymentStatus === 'Paid');
+  if (filter === 'cancelled') return orders.filter((order) => ['Cancelled', 'Rejected'].includes(order.status));
+  return orders;
+}
+
+function renderAdmin() {
+  const orders = readOrders();
+  const body = document.querySelector('[data-admin-orders]');
+  if (!body) return;
+  const delivered = orders.filter((order) => ['Delivered', 'Completed'].includes(order.status));
+  const visibleOrders = getAdminFilteredOrders(orders);
+  document.querySelector('[data-admin-stats]').innerHTML = `<article class="stat-card"><span>Total requests</span><strong>${orders.length}</strong></article><article class="stat-card"><span>Active requests</span><strong>${orders.filter((order) => !['Delivered', 'Completed', 'Rejected', 'Cancelled'].includes(order.status)).length}</strong></article><article class="stat-card"><span>Delivered revenue</span><strong>${money(delivered.reduce((sum, order) => sum + Number(order.total || 0), 0))}</strong></article>`;
+  body.innerHTML = visibleOrders.length ? visibleOrders.map((order) => `<tr><td><a href="receipt.html?id=${encodeURIComponent(order.id)}">${escapePortalText(order.id)}</a></td><td>${escapePortalText(order.customerName)}<br><small>${escapePortalText(order.phone)}</small></td><td>${escapePortalText(order.service)}</td><td>${order.preApprovalEstimate ? `Est. ${money(order.total)}` : (order.total ? money(order.total) : 'TBD')}</td><td><select data-status="${escapePortalText(order.id)}">${statuses.map((status) => `<option ${status === order.status ? 'selected' : ''}>${status}</option>`).join('')}</select></td><td><a href="receipt.html?id=${encodeURIComponent(order.id)}">Receipt</a><small class="order-request-time">Received: ${escapePortalText(order.createdAt || 'Not available')}</small><small class="order-completed-time">Completed: ${escapePortalText(order.completedAt || 'Not completed')}</small></td></tr>`).join('') : '<tr><td colspan="6">No requests match this filter.</td></tr>';
+  body.querySelectorAll('[data-status]').forEach((element) => element.addEventListener('change', async () => {
+    const nextStatus = element.value;
+    const list = readOrders();
+    const item = list.find((order) => order.id === element.dataset.status);
+    const needsNote = ['Rejected', 'Cancelled'].includes(nextStatus);
+    const note = needsNote ? await requestStatusNote(nextStatus) : '';
+    if (needsNote && !note) { element.value = item?.status || 'Requested'; return; }
+    if (item) {
+      item.status = nextStatus;
+      if (needsNote) {
+        item.cancellationNote = note;
+        item.cancelledBy = 'Admin';
+        item.cancelledAt = new Date().toLocaleString();
+      }
+      if (['Delivered', 'Completed'].includes(nextStatus) && !item.completedAt) item.completedAt = new Date().toLocaleString();
+      saveOrders(list);
+    }
+    try {
+      const client = await hhtSupabaseReady;
+      const { error } = await client.from('orders').update({ status: nextStatus, payload: item }).eq('id', element.dataset.status);
+      if (error) throw error;
+    } catch (error) {
+      console.warn('Cloud status update unavailable.', error);
+    }
+    if (item) sendOrderNotification(item, 'status_update').catch((error) => console.warn('Status notification unavailable.', error));
+    renderAdmin();
+  }));
+}
 renderAdmin();
+document.querySelector('[data-admin-filter]')?.addEventListener('change', renderAdmin);
 function openAdminOrderDetails(order) {
   const mapsLink = (address) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address || '')}`;
   const formatCalendarTime = (date) => [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('') + 'T' + [String(date.getHours()).padStart(2, '0'), String(date.getMinutes()).padStart(2, '0'), '00'].join('');
@@ -1022,3 +1070,16 @@ const refreshReviewsButton = document.querySelector('[data-refresh-reviews]');
 if (refreshReviewsButton) refreshReviewsButton.addEventListener('click', loadAdminReviews);
 loadPublicReviews();
 if (document.querySelector('[data-admin-reviews]')) window.setTimeout(loadAdminReviews, 800);
+
+function addCustomerQuickActions() {
+  const customerPages = ['/', '/index.html', '/ride-booking.html', '/package-booking.html', '/tracking.html', '/reviews.html', '/business-contact.html'];
+  if (!customerPages.includes(location.pathname)) return;
+  if (document.querySelector('.customer-quick-actions')) return;
+  const bar = document.createElement('nav');
+  bar.className = 'customer-quick-actions';
+  bar.setAttribute('aria-label', 'Quick customer actions');
+  bar.innerHTML = '<a href="ride-booking.html">Book a ride</a><a href="package-booking.html">Start delivery</a><a href="sms:+12398001380?body=Hi%20Hustle%20Hall%20Transport%2C%20I%20need%20help%20with%20a%20ride%20or%20delivery.">Text us</a>';
+  document.body.append(bar);
+}
+
+addCustomerQuickActions();
