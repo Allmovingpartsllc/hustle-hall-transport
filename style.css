@@ -277,3 +277,74 @@ body { background: var(--paper); }
   .review-layout { grid-template-columns: 1fr; }
   .review-home-card { align-items: flex-start; flex-direction: column; }
 }
+
+
+/* Customer experience improvements */
+.service-info-grid,
+.trust-grid,
+.faq-grid {
+  display: grid;
+  gap: 1rem;
+}
+.service-info-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.trust-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.service-info-card,
+.trust-card,
+.faq-grid details {
+  padding: 1.2rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(24, 24, 39, .05);
+}
+.service-info-card strong,
+.trust-card h3 { display: block; margin-bottom: .35rem; }
+.service-info-card p,
+.trust-card p { margin: 0; color: #59606b; line-height: 1.55; }
+.faq-grid details { cursor: pointer; }
+.faq-grid summary { font-weight: 800; color: #241820; }
+.faq-grid details p { color: #59606b; line-height: 1.6; margin: .85rem 0 0; }
+.customer-quick-actions {
+  display: none;
+  position: fixed;
+  z-index: 50;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  grid-template-columns: repeat(3, 1fr);
+  gap: .45rem;
+  padding: .65rem;
+  background: rgba(20, 10, 16, .94);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, .22);
+}
+.customer-quick-actions a {
+  min-height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  color: #fff;
+  font-size: .83rem;
+  font-weight: 800;
+  text-align: center;
+  text-decoration: none;
+}
+.customer-quick-actions a:nth-child(1) { background: #e82d7c; }
+.customer-quick-actions a:nth-child(2) { background: #8f1248; }
+.customer-quick-actions a:nth-child(3) { background: #2f7a46; }
+.admin-filter-actions { align-items: end; }
+.admin-filter-actions label { display: grid; gap: .35rem; font-weight: 700; color: #241820; }
+.admin-filter-actions select {
+  min-height: 42px;
+  padding: .55rem .65rem;
+  border: 1px solid #d6d9df;
+  border-radius: 10px;
+  font: inherit;
+  background: #fff;
+}
+@media (max-width: 820px) {
+  .service-info-grid,
+  .trust-grid { grid-template-columns: 1fr; }
+  .customer-quick-actions { display: grid; }
+  body { padding-bottom: 72px; }
+  .admin-filter-actions { align-items: stretch; }
+}
