@@ -22,7 +22,8 @@ grant update, delete on table public.reviews to authenticated;
 drop policy if exists "reviews_public_read_approved" on public.reviews;
 drop policy if exists "reviews_public_submit_pending" on public.reviews;
 drop policy if exists "reviews_admin_read_all" on public.reviews;
-drop policy if exists "reviews_admin_manage" on public.reviews;
+drop policy if exists "reviews_admin_update" on public.reviews;
+drop policy if exists "reviews_admin_delete" on public.reviews;
 
 create policy "reviews_public_read_approved"
 on public.reviews
@@ -53,9 +54,9 @@ using (
   )
 );
 
-create policy "reviews_admin_manage"
+create policy "reviews_admin_update"
 on public.reviews
-for update, delete
+for update
 to authenticated
 using (
   exists (
@@ -66,6 +67,19 @@ using (
   )
 )
 with check (
+  exists (
+    select 1
+    from public.profiles
+    where profiles.id = (select auth.uid())
+      and profiles.role = 'admin'
+  )
+);
+
+create policy "reviews_admin_delete"
+on public.reviews
+for delete
+to authenticated
+using (
   exists (
     select 1
     from public.profiles
