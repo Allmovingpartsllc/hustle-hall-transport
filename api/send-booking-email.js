@@ -1,5 +1,6 @@
 const ADMIN_EMAIL = 'HustleHall@allmovingparts.com';
 const DEFAULT_FROM = 'Hustle Hall Transport <notifications@allmovingparts.com>';
+const SITE_URL = 'https://hustlehall.allmovingparts.com';
 const crypto = require('crypto');
 
 function escapeHtml(value) {
@@ -141,6 +142,7 @@ module.exports = async (request, response) => {
   const serviceName = order.service === 'package' ? 'package delivery' : 'ride';
   const copy = messageCopy(event, order, serviceName);
   const orderTable = `<table style="width:100%;border-collapse:collapse">${details(order)}</table>`;
+  const trackingLink = `<p style="margin:24px 0"><a href="${SITE_URL}/tracking.html" style="display:inline-block;background:#d91f73;color:#fff;padding:12px 18px;border-radius:8px;font-weight:700;text-decoration:none">Track your request</a></p>`;
   const businessMessage = {
     from,
     to: [ADMIN_EMAIL],
@@ -156,7 +158,7 @@ module.exports = async (request, response) => {
         from,
         to: [order.email],
         subject: copy.customerSubject,
-        html: `<div style="font-family:Arial,sans-serif;color:#241820"><h1 style="color:#d91f73">${escapeHtml(copy.customerTitle)}</h1><p>Hi ${escapeHtml(order.customerName)},</p><p>${escapeHtml(copy.customerText)}</p>${orderTable}<p style="margin-top:24px"><strong>Hustle Hall Transport</strong><br>239-800-1380<br>Hustle Hard. Deliver Smart.</p></div>`
+        html: `<div style="font-family:Arial,sans-serif;color:#241820"><h1 style="color:#d91f73">${escapeHtml(copy.customerTitle)}</h1><p>Hi ${escapeHtml(order.customerName)},</p><p>${escapeHtml(copy.customerText)}</p>${orderTable}${trackingLink}<p style="margin-top:24px"><strong>Hustle Hall Transport</strong><br>239-800-1380<br>Hustle Hard. Deliver Smart.</p></div>`
       });
     }
     try {
