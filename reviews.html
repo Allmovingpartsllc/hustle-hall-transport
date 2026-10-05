@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Read customer reviews and share your experience with Hustle Hall Transport." />
+  <link rel="canonical" href="https://hustlehall.allmovingparts.com/reviews.html" />
+  <meta name="theme-color" content="#e82d7c" />
+  <title>Reviews | Hustle Hall Transport</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header" id="top">
+    <div class="container nav-wrap">
+      <a class="brand" href="index.html" aria-label="Hustle Hall Transport home">
+        <span class="brand-mark" aria-hidden="true">HH</span>
+        <span>Hustle Hall <small>Transport</small></span>
+      </a>
+      <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="main-navigation">
+        <span class="sr-only">Open menu</span><span></span><span></span><span></span>
+      </button>
+      <nav class="main-nav" id="main-navigation" aria-label="Main navigation">
+        <a href="index.html#services">Services</a>
+        <a href="tracking.html">Track Order</a>
+        <a href="reviews.html" aria-current="page">Reviews</a>
+        <a href="index.html#contact">Contact</a>
+        <a class="nav-call" href="tel:+12398001380">Call 239-800-1380</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main-content" class="page-main">
+    <div class="container">
+      <section class="review-hero">
+        <p class="eyebrow">Customer feedback</p>
+        <h1 class="page-title">Tell us how we did.</h1>
+        <p>Your feedback helps Hustle Hall Transport improve every ride and delivery. Reviews are checked before they appear publicly.</p>
+      </section>
+
+      <div class="review-layout">
+        <section class="review-form-card" aria-labelledby="leave-review-title">
+          <p class="eyebrow">Leave a review</p>
+          <h2 id="leave-review-title">Share your experience</h2>
+          <form data-review-form>
+            <fieldset class="star-fieldset">
+              <legend>Overall rating <span aria-hidden="true">*</span></legend>
+              <div class="star-rating" aria-label="Choose a rating from 1 to 5 stars">
+                <input type="radio" id="star5" name="rating" value="5" required><label for="star5" title="5 stars">★</label>
+                <input type="radio" id="star4" name="rating" value="4"><label for="star4" title="4 stars">★</label>
+                <input type="radio" id="star3" name="rating" value="3"><label for="star3" title="3 stars">★</label>
+                <input type="radio" id="star2" name="rating" value="2"><label for="star2" title="2 stars">★</label>
+                <input type="radio" id="star1" name="rating" value="1"><label for="star1" title="1 star">★</label>
+              </div>
+            </fieldset>
+
+            <label for="review-name">Name <span class="optional-label">(optional)</span></label>
+            <input id="review-name" name="customer_name" type="text" maxlength="80" autocomplete="name" placeholder="Your name" />
+
+            <label for="review-service">Service used <span aria-hidden="true">*</span></label>
+            <select id="review-service" name="service" required>
+              <option value="">Choose a service</option>
+              <option>Local Ride</option>
+              <option>Student Transportation</option>
+              <option>Package Delivery</option>
+              <option>Business Delivery</option>
+            </select>
+
+            <label for="review-text">Tell us about your experience <span aria-hidden="true">*</span></label>
+            <textarea id="review-text" name="review_text" rows="6" minlength="10" maxlength="1200" required placeholder="What went well? What could we improve?"></textarea>
+
+            <fieldset class="recommend-fieldset">
+              <legend>Would you recommend Hustle Hall? <span aria-hidden="true">*</span></legend>
+              <label><input type="radio" name="recommend" value="yes" required> Yes</label>
+              <label><input type="radio" name="recommend" value="no"> No</label>
+            </fieldset>
+
+            <div class="review-honeypot" aria-hidden="true">
+              <label for="review-company">Company</label>
+              <input id="review-company" name="company" type="text" tabindex="-1" autocomplete="off" />
+            </div>
+
+            <button class="button button-primary review-submit" type="submit">Submit Review</button>
+            <p class="review-message" data-review-message aria-live="polite"></p>
+          </form>
+        </section>
+
+        <section class="review-list-section" aria-labelledby="customer-reviews-title">
+          <p class="eyebrow">What customers say</p>
+          <h2 id="customer-reviews-title">Hustle Hall reviews</h2>
+          <div class="reviews-grid" data-public-reviews>
+            <p class="review-loading">Loading approved reviews…</p>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-content">
+      <a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true">HH</span><span>Hustle Hall <small>Transport</small></span></a>
+      <p>Hustle Hard. Deliver Smart.</p>
+      <p>Powered by ALLMOVINGPARTS LLC</p>
+    </div>
+  </footer>
+</body>
+</html>
