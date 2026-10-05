@@ -348,3 +348,5 @@ body { background: var(--paper); }
   body { padding-bottom: 72px; }
   .admin-filter-actions { align-items: stretch; }
 }
+
+.booking-submit-note { margin: 1rem 0 0; color: #59606b; font-size: .94rem; line-height: 1.5; }
