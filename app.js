@@ -1072,7 +1072,7 @@ loadPublicReviews();
 if (document.querySelector('[data-admin-reviews]')) window.setTimeout(loadAdminReviews, 800);
 
 function addCustomerQuickActions() {
-  const customerPages = ['/', '/index.html', '/ride-booking.html', '/package-booking.html', '/tracking.html', '/reviews.html', '/business-contact.html'];
+  const customerPages = ['/', '/index.html', '/ride-booking.html', '/package-booking.html', '/tracking.html', '/reviews.html', '/faq.html', '/business-contact.html'];
   if (!customerPages.includes(location.pathname)) return;
   if (document.querySelector('.customer-quick-actions')) return;
   const bar = document.createElement('nav');
