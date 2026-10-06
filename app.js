@@ -1173,3 +1173,195 @@ function enableExactMultiDayCalendar() {
   render(); refresh();
 }
 enableExactMultiDayCalendar();
+/* Admin invoice editor */
+function hhtEditInvoice(orderId) {
+  const order = readOrders().find((item) => item.id === orderId);
+  if (!order) return;
+
+  const amount = (value) => Number(value || 0).toFixed(2);
+  const dialog = document.createElement('dialog');
+
+  dialog.className = 'order-details-dialog invoice-editor-dialog';
+  dialog.innerHTML = `
+    <form method="dialog">
+      <div class="order-details-header">
+        <div>
+          <p class="eyebrow">Admin invoice editor</p>
+          <h2>${escapePortalText(order.id)}</h2>
+        </div>
+        <button type="button" class="order-details-close" aria-label="Close">&times;</button>
+      </div>
+
+      <p>Update the invoice amounts and payment status.</p>
+
+      <div class="form-grid">
+        <label>Base / service fee
+          <input name="base" type="number" min="0" step="0.01" value="${amount(order.base)}">
+        </label>
+
+        <label>Mileage charge
+          <input name="mileage" type="number" min="0" step="0.01" value="${amount(order.mileCharge)}">
+        </label>
+
+        <label>Time charge
+          <input name="timeCharge" type="number" min="0" step="0.01" value="${amount(order.minuteCharge)}">
+        </label>
+
+        <label>Distance surcharge
+          <input name="surcharge" type="number" min="0" step="0.01" value="${amount(order.surcharge)}">
+        </label>
+
+        <label>Promo discount
+          <input name="discount" type="number" min="0" step="0.01" value="${amount(order.promoDiscount)}">
+        </label>
+
+        <label>Payment status
+          <select name="paymentStatus">
+            <option>Awaiting payment</option>
+            <option>Pay in Person</option>
+            <option>Paid</option>
+            <option>Approval pending</option>
+          </select>
+        </label>
+
+        <label class="form-wide">Invoice note
+          <textarea name="invoiceNote" rows="3">${escapePortalText(order.invoiceNote || '')}</textarea>
+        </label>
+      </div>
+
+      <p class="invoice-calculation">
+        Invoice total: <strong data-invoice-total></strong>
+      </p>
+
+      <p class="status-note-error" aria-live="polite"></p>
+
+      <div class="order-details-actions">
+        <button type="button" class="button button-secondary" data-cancel>Cancel</button>
+        <button type="submit" class="button button-primary">Save invoice</button>
+      </div>
+    </form>
+  `;
+
+  document.body.append(dialog);
+
+  const form = dialog.querySelector('form');
+  form.elements.paymentStatus.value = order.paymentStatus || 'Awaiting payment';
+
+  const calculate = () => {
+    const total = Math.max(
+      0,
+      Number(form.elements.base.value || 0) +
+      Number(form.elements.mileage.value || 0) +
+      Number(form.elements.timeCharge.value || 0) +
+      Number(form.elements.surcharge.value || 0) -
+      Number(form.elements.discount.value || 0)
+    );
+
+    form.querySelector('[data-invoice-total]').textContent = money(total);
+    return total;
+  };
+
+  form.querySelectorAll('input').forEach((input) => {
+    input.addEventListener('input', calculate);
+  });
+
+  calculate();
+
+  const close = () => dialog.close();
+
+  dialog.querySelector('.order-details-close').addEventListener('click', close);
+  dialog.querySelector('[data-cancel]').addEventListener('click', close);
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    const total = calculate();
+
+    const updated = {
+      ...order,
+      base: Number(form.elements.base.value || 0),
+      mileCharge: Number(form.elements.mileage.value || 0),
+      minuteCharge: Number(form.elements.timeCharge.value || 0),
+      surcharge: Number(form.elements.surcharge.value || 0),
+      promoDiscount: Number(form.elements.discount.value || 0),
+      total,
+      paymentStatus: form.elements.paymentStatus.value,
+      invoiceNote: form.elements.invoiceNote.value.trim(),
+      invoiceEditedAt: new Date().toLocaleString()
+    };
+
+    const save = form.querySelector('[type="submit"]');
+    save.disabled = true;
+    save.textContent = 'Saving…';
+
+    try {
+      const client = await hhtSupabaseReady;
+
+      const { error } = await client
+        .from('orders')
+        .update({
+          status: updated.status,
+          total: updated.total,
+          payload: updated
+        })
+        .eq('id', updated.id);
+
+      if (error) throw error;
+
+      const orders = readOrders();
+      const index = orders.findIndex((item) => item.id === updated.id);
+
+      if (index >= 0) orders[index] = updated;
+
+      saveOrders(orders);
+      renderAdmin();
+      close();
+    } catch (error) {
+      form.querySelector('.status-note-error').textContent =
+        'Invoice could not be saved. Check your connection and admin access.';
+
+      save.disabled = false;
+      save.textContent = 'Save invoice';
+    }
+  });
+
+  dialog.addEventListener('close', () => dialog.remove());
+  dialog.showModal();
+}
+
+function hhtAttachInvoiceEditor() {
+  document
+    .querySelectorAll('dialog[open].order-details-dialog')
+    .forEach((dialog) => {
+      const actions = dialog.querySelector('.order-details-actions');
+
+      if (!actions || actions.querySelector('[data-edit-invoice]')) return;
+
+      const receipt = actions.querySelector('a[href^="receipt.html"]');
+      if (!receipt) return;
+
+      const orderId = new URL(receipt.href).searchParams.get('id');
+
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'button button-primary';
+      button.dataset.editInvoice = 'true';
+      button.textContent = 'Edit invoice';
+
+      button.addEventListener('click', () => {
+        dialog.close();
+        hhtEditInvoice(orderId);
+      });
+
+      actions.prepend(button);
+    });
+}
+
+new MutationObserver(hhtAttachInvoiceEditor).observe(document.body, {
+  childList: true,
+  subtree: true,
+  attributes: true,
+  attributeFilter: ['open']
+});
+
+hhtAttachInvoiceEditor();
