@@ -1383,3 +1383,171 @@ new MutationObserver(hhtAttachInvoiceLabels).observe(document.body, {
 });
 
 hhtAttachInvoiceLabels();
+
+
+/* Combined invoice support */
+function hhtInvoiceCustomerKey(order) {
+  const phone = String(order.phone || '').replace(/\D/g, '');
+  if (phone) return `phone:${phone}`;
+  const email = String(order.email || '').trim().toLowerCase();
+  return email ? `email:${email}` : '';
+}
+
+function hhtRenderCombinedInvoice() {
+  const target = document.querySelector('[data-receipt]');
+  const orderId = new URLSearchParams(location.search).get('id');
+  const order = readOrders().find((item) => item.id === orderId);
+  const invoice = order?.combinedInvoice;
+  if (!target || !invoice) return;
+
+  const items = Array.isArray(invoice.items) ? invoice.items : [];
+  target.innerHTML = `<p class="eyebrow">Hustle Hall Transport</p>
+    <h1>Combined invoice</h1>
+    <p class="receipt-id">${escapePortalText(invoice.id || order.id)}</p>
+    <p>Created ${escapePortalText(invoice.createdAt || order.createdAt || '')}</p>
+    <hr>
+    <div class="detail-list">
+      <div><span>Customer</span><strong>${escapePortalText(order.customerName || 'Customer')}</strong></div>
+      <div><span>Payment status</span><strong>${escapePortalText(invoice.paymentStatus || order.paymentStatus || 'Awaiting payment')}</strong></div>
+    </div>
+    <hr>
+    ${items.map((item) => `<div class="receipt-row"><span>${escapePortalText(item.id)} · ${escapePortalText(item.service || 'Service')}</span><strong>${money(item.total)}</strong></div>`).join('')}
+    <div class="receipt-row receipt-total"><span>Combined total</span><strong>${money(invoice.total)}</strong></div>
+    ${invoice.note ? `<p><strong>Invoice note:</strong> ${escapePortalText(invoice.note)}</p>` : ''}
+    <hr><p><strong>Hustle Hard. Deliver Smart.</strong><br>239-800-1380<br>Powered by ALLMOVINGPARTS LLC</p>`;
+}
+hhtRenderCombinedInvoice();
+
+function hhtCombineInvoices(primaryId) {
+  const orders = readOrders();
+  const primary = orders.find((item) => item.id === primaryId);
+  if (!primary) return;
+  const customerKey = hhtInvoiceCustomerKey(primary);
+  const candidates = orders.filter((item) => {
+    if (!customerKey || hhtInvoiceCustomerKey(item) !== customerKey) return false;
+    return !['Cancelled', 'Rejected'].includes(item.status);
+  });
+  if (candidates.length < 2) {
+    window.alert('This customer needs at least two saved invoices before they can be combined.');
+    return;
+  }
+
+  const dialog = document.createElement('dialog');
+  dialog.className = 'order-details-dialog invoice-combine-dialog';
+  dialog.innerHTML = `<form method="dialog">
+    <div class="order-details-header">
+      <div><p class="eyebrow">Combined invoice</p><h2>${escapePortalText(primary.customerName || primary.id)}</h2></div>
+      <button type="button" class="order-details-close" aria-label="Close">&times;</button>
+    </div>
+    <p>Select two or more invoices for this customer. The source orders stay saved separately for your records.</p>
+    <div class="form-grid">
+      <label class="form-wide">Invoice note (optional)<textarea name="combinedNote" rows="3">${escapePortalText(primary.combinedInvoice?.note || '')}</textarea></label>
+    </div>
+    <div class="combined-invoice-options">
+      ${candidates.map((item) => `<label><input type="checkbox" value="${escapePortalText(item.id)}" ${item.id === primary.id ? 'checked disabled' : (primary.combinedInvoice?.sourceOrderIds?.includes(item.id) ? 'checked' : '')}> <strong>${escapePortalText(item.id)}</strong> · ${escapePortalText(item.service === 'package' ? 'Package delivery' : 'Ride')} · ${money(item.total)}</label>`).join('')}
+    </div>
+    <p class="invoice-calculation">Combined total: <strong data-combined-total></strong></p>
+    <p class="status-note-error" aria-live="polite"></p>
+    <div class="order-details-actions">
+      <button type="button" class="button button-secondary" data-cancel>Cancel</button>
+      <button type="submit" class="button button-primary">Save combined invoice</button>
+    </div>
+  </form>`;
+  document.body.append(dialog);
+
+  const form = dialog.querySelector('form');
+  const chosen = () => [...form.querySelectorAll('input[type="checkbox"]:checked')]
+    .map((box) => orders.find((item) => item.id === box.value))
+    .filter(Boolean);
+  const refresh = () => {
+    form.querySelector('[data-combined-total]').textContent = money(chosen().reduce((sum, item) => sum + Number(item.total || 0), 0));
+  };
+  form.querySelectorAll('input[type="checkbox"]').forEach((box) => box.addEventListener('change', refresh));
+  refresh();
+
+  const close = () => dialog.close();
+  dialog.querySelector('.order-details-close').addEventListener('click', close);
+  dialog.querySelector('[data-cancel]').addEventListener('click', close);
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const selected = chosen();
+    const error = form.querySelector('.status-note-error');
+    if (selected.length < 2) {
+      error.textContent = 'Select at least two invoices.';
+      return;
+    }
+
+    const createdAt = new Date().toLocaleString();
+    const combinedId = primary.combinedInvoice?.id || `HHT-COM-${Date.now()}`;
+    const items = selected.map((item) => ({
+      id: item.id,
+      service: item.service === 'package' ? 'Package delivery' : 'Ride',
+      createdAt: item.createdAt,
+      total: Number(item.total || 0)
+    }));
+    const combinedInvoice = {
+      id: combinedId,
+      createdAt,
+      sourceOrderIds: selected.map((item) => item.id),
+      items,
+      total: items.reduce((sum, item) => sum + item.total, 0),
+      paymentStatus: primary.paymentStatus || 'Awaiting payment',
+      note: form.elements.combinedNote.value.trim()
+    };
+    const updates = selected.map((item) => item.id === primary.id
+      ? { ...item, combinedInvoice, invoiceEditedAt: createdAt }
+      : { ...item, combinedInto: { id: combinedId, primaryOrderId: primary.id, createdAt } });
+
+    const save = form.querySelector('[type="submit"]');
+    save.disabled = true;
+    save.textContent = 'Saving…';
+    try {
+      const client = await hhtSupabaseReady;
+      const results = await Promise.all(updates.map((item) => client.from('orders')
+        .update({ status: item.status, total: item.total, payload: item })
+        .eq('id', item.id)));
+      const failed = results.find((result) => result.error);
+      if (failed?.error) throw failed.error;
+
+      const list = readOrders().map((item) => updates.find((updated) => updated.id === item.id) || item);
+      saveOrders(list);
+      renderAdmin();
+      close();
+      window.location.href = `receipt.html?id=${encodeURIComponent(primary.id)}`;
+    } catch (saveError) {
+      error.textContent = 'The combined invoice could not be saved. Check your connection and admin access.';
+      save.disabled = false;
+      save.textContent = 'Save combined invoice';
+    }
+  });
+  dialog.addEventListener('close', () => dialog.remove());
+  dialog.showModal();
+}
+
+function hhtAttachCombinedInvoice() {
+  document.querySelectorAll('dialog[open].order-details-dialog').forEach((dialog) => {
+    const actions = dialog.querySelector('.order-details-actions');
+    const receipt = actions?.querySelector('a[href^="receipt.html"]');
+    if (!actions || !receipt || actions.querySelector('[data-combine-invoices]')) return;
+    const orderId = new URL(receipt.href).searchParams.get('id');
+    const order = readOrders().find((item) => item.id === orderId);
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'button button-secondary';
+    button.dataset.combineInvoices = 'true';
+    button.textContent = order?.combinedInvoice ? 'Update combined invoice' : 'Combine invoices';
+    button.addEventListener('click', () => {
+      dialog.close();
+      hhtCombineInvoices(orderId);
+    });
+    actions.prepend(button);
+  });
+}
+new MutationObserver(hhtAttachCombinedInvoice).observe(document.body, {
+  childList: true,
+  subtree: true,
+  attributes: true,
+  attributeFilter: ['open']
+});
+hhtAttachCombinedInvoice();
