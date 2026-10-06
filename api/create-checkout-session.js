@@ -1,5 +1,16 @@
 const Stripe = require('stripe');
 
+function isTuesdayFiveEligible(order) {
+  if (order.service !== 'ride' || order.rideType === 'multi') return false;
+  const miles = Math.max(0, Number(order.miles) || 0);
+  if (!order.date || !order.time || miles <= 0 || miles > 15) return false;
+  const date = new Date(order.date + 'T12:00:00Z');
+  if (Number.isNaN(date.getTime()) || date.getUTCDay() !== 2) return false;
+  const parts = String(order.time).split(':').map(Number);
+  const pickupMinutes = (parts[0] * 60) + parts[1];
+  return pickupMinutes >= (14 * 60) && pickupMinutes <= (17 * 60);
+}
+
 function calculateTotal(order) {
   const miles = Math.max(0, Number(order.miles) || 0);
   if (order.service === 'package') {
@@ -8,6 +19,7 @@ function calculateTotal(order) {
     const additionalMiles = Math.max(0, miles - 20);
     return base + (miles > 20 ? 10 + (additionalMiles * 0.35) : 0);
   }
+  if (isTuesdayFiveEligible(order)) return 5;
   const minutes = Math.max(0, Number(order.minutes) || 0);
   const base = miles <= 5 ? 5 : 4.25;
   return base + (miles * 0.25) + (minutes * 0.10);
@@ -41,7 +53,7 @@ module.exports = async function handler(req, res) {
         },
         quantity: 1
       }],
-      metadata: { bookingId: order.id, customerName: order.customerName || '', serviceType: order.service },
+      metadata: { bookingId: order.id, customerName: order.customerName || '', serviceType: order.service, promoCode: isTuesdayFiveEligible(order) ? 'TUESDAY5' : (order.promoCode || '') },
       success_url: `https://hustlehall.allmovingparts.com/receipt.html?id=${encodeURIComponent(order.id)}&payment=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `https://hustlehall.allmovingparts.com/${page}.html?payment=cancelled`
     });
