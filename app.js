@@ -1117,3 +1117,59 @@ function addCustomerQuickActions() {
 }
 
 addCustomerQuickActions();
+
+
+/* Exact-date multi-day calendar */
+function enableExactMultiDayCalendar() {
+  const form = document.querySelector('[data-booking-form][data-service="ride"]');
+  const multiFields = form?.querySelector('[data-multi-ride-fields]');
+  if (!form || !multiFields || form.querySelector('[data-exact-service-calendar]')) return;
+  const start = form.elements.startDate;
+  const end = form.elements.endDate;
+  if (!start || !end) return;
+  start.closest('label')?.classList.add('exact-date-source');
+  end.closest('label')?.classList.add('exact-date-source');
+  form.insertAdjacentHTML('beforeend', '<input type="hidden" name="selectedDates"><input type="hidden" name="selectedDateSummary">');
+  const picker = document.createElement('section');
+  picker.className = 'exact-date-picker';
+  picker.hidden = true;
+  picker.innerHTML = '<h3>Choose your exact service days</h3><p>Select individual days, such as Monday and Wednesday, or choose every day in a date range.</p><div class="exact-date-mode"><label><input type="radio" name="exactDateMode" value="specific" checked> Individual dates</label><label><input type="radio" name="exactDateMode" value="range"> Every day in a range</label></div><div class="exact-date-calendar" data-exact-service-calendar></div><p class="exact-date-summary" data-exact-date-summary aria-live="polite">Select the dates you need service.</p>';
+  multiFields.insertAdjacentElement('afterend', picker);
+  const style = document.createElement('style');
+  style.textContent = '.exact-date-source{display:none!important}.exact-date-picker{margin:1rem 0;padding:1rem;border:1px solid #e5e7eb;border-radius:16px;background:#fff}.exact-date-picker h3{margin:0;color:#241820}.exact-date-picker p{color:#59606b;line-height:1.5}.exact-date-mode{display:flex;flex-wrap:wrap;gap:.75rem 1.25rem;margin:1rem 0}.exact-date-mode label{display:flex;align-items:center;gap:.4rem;font-weight:700}.exact-date-calendar{max-width:430px;padding:1rem;border:1px solid #e5e7eb;border-radius:14px;background:#fff}.exact-date-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem}.exact-date-header button{width:36px;height:36px;border:1px solid #d8dce3;border-radius:9px;background:#fff;font-size:1.5rem;cursor:pointer}.exact-date-weekdays,.exact-date-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:.35rem;text-align:center}.exact-date-weekdays{margin-bottom:.35rem;color:#68707b;font-size:.75rem;font-weight:800}.exact-date-day{aspect-ratio:1;min-height:36px;border:1px solid transparent;border-radius:9px;background:#f6f7f9;color:#241820;font-weight:800;cursor:pointer}.exact-date-day:hover,.exact-date-day:focus-visible{border-color:#d91f73;outline:none}.exact-date-day.is-selected{background:#d91f73;color:#fff}.exact-date-summary{font-weight:750!important}@media(max-width:520px){.exact-date-calendar{padding:.75rem}.exact-date-grid{gap:.22rem}.exact-date-day{min-height:34px}}';
+  document.head.append(style);
+  const selected = new Set();
+  let mode = 'specific';
+  let month = new Date(); month.setDate(1);
+  const key = (d) => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  const parse = (value) => new Date(value + 'T12:00:00');
+  const friendly = (value) => parse(value).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
+  const dates = () => [...selected].sort();
+  const sync = () => {
+    const values = dates();
+    form.elements.selectedDates.value = values.join(',');
+    form.elements.selectedDateSummary.value = values.map(friendly).join(', ');
+    if (values.length) {
+      const calculatedEnd = parse(values[0]); calculatedEnd.setDate(calculatedEnd.getDate()+values.length-1);
+      start.value = values[0]; end.value = key(calculatedEnd);
+      if (form.elements.date) form.elements.date.value = values[0];
+    } else { start.value=''; end.value=''; }
+    picker.querySelector('[data-exact-date-summary]').textContent = values.length ? values.length + ' service day' + (values.length===1?'':'s') + ' selected: ' + values.map(friendly).join(', ') + '.' : 'Select the dates you need service.';
+    form.dispatchEvent(new Event('input',{bubbles:true}));
+  };
+  const chooseRange = (a,b) => { selected.clear(); for(let d=parse(a), last=parse(b); d<=last; d.setDate(d.getDate()+1)) selected.add(key(d)); };
+  const render = () => {
+    const first = new Date(month.getFullYear(),month.getMonth(),1); const lastDay = new Date(month.getFullYear(),month.getMonth()+1,0).getDate();
+    const cells = Array.from({length:first.getDay()},()=>'<span></span>');
+    for(let day=1;day<=lastDay;day+=1){const value=key(new Date(month.getFullYear(),month.getMonth(),day));cells.push('<button type="button" class="exact-date-day'+(selected.has(value)?' is-selected':'')+'" data-exact-date="'+value+'" aria-pressed="'+selected.has(value)+'">'+day+'</button>');}
+    picker.querySelector('[data-exact-service-calendar]').innerHTML = '<div class="exact-date-header"><button type="button" data-exact-prev aria-label="Previous month">‹</button><strong>'+month.toLocaleDateString(undefined,{month:'long',year:'numeric'})+'</strong><button type="button" data-exact-next aria-label="Next month">›</button></div><div class="exact-date-weekdays"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div><div class="exact-date-grid">'+cells.join('')+'</div>';
+    picker.querySelector('[data-exact-prev]').addEventListener('click',()=>{month.setMonth(month.getMonth()-1);render();});
+    picker.querySelector('[data-exact-next]').addEventListener('click',()=>{month.setMonth(month.getMonth()+1);render();});
+    picker.querySelectorAll('[data-exact-date]').forEach((button)=>button.addEventListener('click',()=>{const value=button.dataset.exactDate;if(mode==='specific'){selected.has(value)?selected.delete(value):selected.add(value);}else if(selected.size!==1){selected.clear();selected.add(value);}else{const firstDate=[...selected][0];chooseRange(firstDate<value?firstDate:value,firstDate<value?value:firstDate);}sync();render();}));
+  };
+  const refresh = () => { picker.hidden = form.elements.rideType?.value !== 'multi'; };
+  form.elements.rideType?.addEventListener('change',refresh);
+  picker.querySelectorAll('input[name="exactDateMode"]').forEach((radio)=>radio.addEventListener('change',()=>{mode=radio.value;selected.clear();sync();render();}));
+  render(); refresh();
+}
+enableExactMultiDayCalendar();
