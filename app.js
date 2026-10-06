@@ -40,15 +40,31 @@ const PROMO_CODES = {
   WELCOME10: { type: 'percent', value: 10, maxDiscount: 5, label: '10% off, up to $5' },
   LOCAL5: { type: 'fixed', value: 5, minimumSubtotal: 15, label: '$5 off orders of $15 or more' },
   SCHOOL: { type: 'percent', value: 30, maxDiscount: 5, service: 'ride', allowMultiRide: true, label: '30% off rides, up to $5 per ride' },
-  TKA: { type: 'percent', value: 45, allowMultiRide: true, label: '45% off eligible orders, including multi-day rides' }
+  TKA: { type: 'percent', value: 45, allowMultiRide: true, label: '45% off eligible orders, including multi-day rides' },
+  TUESDAY5: { type: 'special', service: 'ride', label: '$5 one-way rides on Tuesdays from 2 PM to 5 PM, up to 15 miles' }
 };
+
+function isTuesdayFiveEligible(form) {
+  if (form.dataset.service !== 'ride' || form.elements.rideType?.value === 'multi') return false;
+  const miles = Math.max(0, Number(form.elements.miles?.value || 0));
+  const dateValue = form.elements.date?.value;
+  const timeValue = form.elements.time?.value;
+  if (!dateValue || !timeValue || miles <= 0 || miles > 15) return false;
+  const date = new Date(`${dateValue}T12:00:00`);
+  if (Number.isNaN(date.getTime()) || date.getDay() !== 2) return false;
+  const [hour, minute] = timeValue.split(':').map(Number);
+  const pickupMinutes = (hour * 60) + minute;
+  return pickupMinutes >= (14 * 60) && pickupMinutes <= (17 * 60);
+}
 const statuses = ['Requested', 'Pending Approval', 'Accepted', 'Rejected', 'Cancelled', 'Driver Assigned', 'Driver En Route', 'Picked Up', 'In Transit', 'Delivered', 'Completed'];
 const readOrders = () => JSON.parse(localStorage.getItem(HHT_ORDERS) || '[]');
 const saveOrders = (orders) => localStorage.setItem(HHT_ORDERS, JSON.stringify(orders));
 const money = (value) => `${Number(value || 0).toFixed(2)}`;
 
 function calculatePromo(form, subtotal, options = {}) {
-  const code = String(form.elements.promoCode?.value || '').trim().toUpperCase();
+  const enteredCode = String(form.elements.promoCode?.value || '').trim().toUpperCase();
+  const tuesdayFiveEligible = isTuesdayFiveEligible(form);
+  const code = tuesdayFiveEligible ? 'TUESDAY5' : enteredCode;
   const message = form.querySelector('[data-promo-message]');
   const discountRow = form.querySelector('[data-promo-discount-row]');
   const discountValue = form.querySelector('[data-promo-discount]');
@@ -58,7 +74,15 @@ function calculatePromo(form, subtotal, options = {}) {
   let accepted = false;
   let pending = false;
   let messageText = '';
-  if (code && !promo) {
+  if (code === 'TUESDAY5') {
+    if (tuesdayFiveEligible) {
+      discount = Math.max(0, subtotal - 5);
+      accepted = true;
+      messageText = 'TUESDAY5 applied automatically: this eligible Tuesday ride is $5.';
+    } else {
+      messageText = 'TUESDAY5 applies automatically to one-way Tuesday rides with pickup from 2 PM to 5 PM and a route of 15 miles or less.';
+    }
+  } else if (code && !promo) {
     messageText = 'That promo code is not available.';
   } else if (promo?.service && promo.service !== form.dataset.service) {
     messageText = 'This promo applies to rides only.';
@@ -88,7 +112,7 @@ function calculatePromo(form, subtotal, options = {}) {
   }
   if (discountRow) discountRow.hidden = !discount;
   if (discountValue) discountValue.textContent = `-${money(discount)}`;
-  return { promoCode: accepted ? code : '', promoDiscount: discount, promoLabel: accepted ? promo.label : '', promoPending: pending };
+  return { promoCode: accepted ? code : '', promoDiscount: discount, promoLabel: accepted ? promo.label : '', promoPending: pending, autoPromo: accepted && code === 'TUESDAY5' };
 }
 const makeId = () => `HHT-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}-${String(Date.now()).slice(-5)}`;
 
@@ -230,7 +254,7 @@ addPaymentFields();
 function addPromoFields() {
   document.querySelectorAll('[data-booking-form]').forEach((form) => {
     if (form.elements.promoCode) return;
-    form.querySelector('.quote-card')?.insertAdjacentHTML('beforebegin', '<section class="promo-section"><h2>Promo code</h2><div class="form-grid"><label class="form-wide">Enter a promo code (optional)<input name="promoCode" autocomplete="off" autocapitalize="characters"></label></div><p class="promo-message" data-promo-message aria-live="polite"></p></section>');
+    form.querySelector('.quote-card')?.insertAdjacentHTML('beforebegin', '<section class="promo-section"><h2>Promo code</h2><div class="form-grid"><label class="form-wide">Enter a promo code (optional)<input name="promoCode" autocomplete="off" autocapitalize="characters"></label></div><p class="promo-auto-note">Tuesday special: eligible one-way rides scheduled Tuesday from 2 PM to 5 PM, up to 15 miles, are automatically reduced to $5. No code entry is required.</p><p class="promo-message" data-promo-message aria-live="polite"></p></section>');
     form.querySelector('.quote-total')?.insertAdjacentHTML('beforebegin', '<div class="quote-row" data-promo-discount-row hidden><span>Promo discount</span><strong data-promo-discount>-$0.00</strong></div>');
   });
 }
