@@ -13,12 +13,22 @@ async function updatePaymentStatus(session, paymentStatus) {
   const [booking] = await lookup.json();
   if (!booking) return;
 
+  const currentPayload = booking.payload || {};
+  const paidAt = paymentStatus === 'Paid' ? new Date().toLocaleString() : undefined;
   const payload = {
-    ...(booking.payload || {}),
+    ...currentPayload,
     paymentStatus,
     stripeSessionId: session.id,
-    paidAt: paymentStatus === 'Paid' ? new Date().toLocaleString() : undefined
+    paidAt
   };
+  if (currentPayload.invoice && session.metadata?.paymentType === 'invoice') {
+    payload.invoice = {
+      ...currentPayload.invoice,
+      status: paymentStatus === 'Paid' ? 'Paid' : currentPayload.invoice.status,
+      paidAt: paidAt || currentPayload.invoice.paidAt,
+      stripeSessionId: session.id
+    };
+  }
   const update = await fetch(orderUrl, {
     method: 'PATCH',
     headers: { ...headers, Prefer: 'return=minimal' },
