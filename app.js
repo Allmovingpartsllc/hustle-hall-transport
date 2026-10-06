@@ -1365,3 +1365,21 @@ new MutationObserver(hhtAttachInvoiceEditor).observe(document.body, {
 });
 
 hhtAttachInvoiceEditor();
+
+
+// Keeps the invoice actions clearly labeled in admin order details.
+function hhtAttachInvoiceLabels() {
+  document.querySelectorAll('dialog[open].order-details-dialog').forEach((dialog) => {
+    const receipt = dialog.querySelector('.order-details-actions a[href^="receipt.html"]');
+    if (receipt) receipt.textContent = 'View invoice';
+  });
+}
+
+new MutationObserver(hhtAttachInvoiceLabels).observe(document.body, {
+  childList: true,
+  subtree: true,
+  attributes: true,
+  attributeFilter: ['open']
+});
+
+hhtAttachInvoiceLabels();
