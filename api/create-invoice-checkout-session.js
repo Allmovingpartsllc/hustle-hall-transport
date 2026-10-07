@@ -21,9 +21,10 @@ module.exports = async function handler(req, res) {
     if (!id || !token) return res.status(400).json({ error: 'A valid invoice is required.' });
 
     const row = await loadOrder(id);
-    const order = (row && row.payload) || {};
+    if (!row) return res.status(404).json({ error: 'Invoice not found.' });
+    const order = row.payload || {};
     const invoice = order.invoice || {};
-    if (!row || !invoice.token || invoice.token !== token) return res.status(404).json({ error: 'Invoice not found.' });
+    if (!invoice.token || invoice.token !== token) return res.status(404).json({ error: 'Invoice not found.' });
     if (order.paymentStatus === 'Paid' || invoice.status === 'Paid') return res.status(409).json({ error: 'This invoice has already been paid.' });
 
     const amount = Number(invoice.amount);
@@ -31,6 +32,11 @@ module.exports = async function handler(req, res) {
 
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
     const invoiceUrl = 'https://hustlehall.allmovingparts.com/invoice.html?id=' + encodeURIComponent(id) + '&token=' + encodeURIComponent(token);
+    const rideCount = Array.isArray(invoice.lineItems) && invoice.lineItems.length ? invoice.lineItems.length : 1;
+    const description = rideCount > 1
+      ? rideCount + ' itemized rides'
+      : (invoice.description || 'Transportation services');
+
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       customer_email: order.email || undefined,
@@ -40,13 +46,18 @@ module.exports = async function handler(req, res) {
           currency: 'usd',
           product_data: {
             name: 'Hustle Hall Transport - Invoice ' + (invoice.number || row.id),
-            description: invoice.description || 'Transportation services'
+            description
           },
           unit_amount: Math.round(amount * 100)
         },
         quantity: 1
       }],
-      metadata: { bookingId: row.id, invoiceNumber: invoice.number || '', paymentType: 'invoice' },
+      metadata: {
+        bookingId: row.id,
+        invoiceNumber: invoice.number || '',
+        paymentType: 'invoice',
+        rideCount: String(rideCount)
+      },
       success_url: invoiceUrl + '&payment=success&session_id={CHECKOUT_SESSION_ID}',
       cancel_url: invoiceUrl + '&payment=cancelled'
     });
