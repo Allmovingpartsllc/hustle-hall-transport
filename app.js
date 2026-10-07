@@ -738,11 +738,11 @@ function initializeAuthPage() {
 
 const adminOnlyPage = location.pathname.toLowerCase().endsWith('/admin.html');
 const driverOnlyPage = location.pathname.toLowerCase().endsWith('/driver.html');
-if ((adminOnlyPage || driverOnlyPage) && currentUser()?.role !== 'admin') {
-  window.location.replace(`login.html?next=${driverOnlyPage ? 'driver.html' : 'admin.html'}`);
-} else {
-  accountNavigation(); initializeAuthPage();
-}
+
+// Supabase is the source of truth for staff access. Do not redirect from a
+// stale or missing localStorage session before the cloud session is checked.
+accountNavigation();
+initializeAuthPage();
 
 async function cloudProfile(client, user) {
   const { data, error } = await client.from('profiles').select('full_name, role').eq('id', user.id).single();
