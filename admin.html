@@ -1,14 +1,49 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin Dashboard | Hustle Hall Transport</title><link rel="stylesheet" href="style.css?v=ux-2"><script src="app.js?v=ux-2" defer></script><style>
-.admin-invoice-action{display:block;margin:.45rem 0 .2rem;padding:.45rem .65rem;border:1px solid #e82d7c;border-radius:.5rem;background:transparent;color:#e82d7c;font:inherit;font-size:.82rem;font-weight:800;cursor:pointer}.admin-invoice-action:hover{background:#fff0f6}.admin-invoice-help{font-size:.8rem;color:#666;max-width:290px}.invoice-builder-dialog{width:min(720px,calc(100% - 2rem));max-height:calc(100vh - 2rem);border:0;border-radius:1rem;padding:0;box-shadow:0 24px 80px rgba(0,0,0,.28)}.invoice-builder-dialog::backdrop{background:rgba(0,0,0,.65)}.invoice-builder-form{padding:1.4rem}.invoice-builder-header{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:1rem}.invoice-builder-header h2{margin:.15rem 0}.invoice-builder-header p{margin:0}.invoice-dialog-close{border:0;background:transparent;font-size:2rem;cursor:pointer;line-height:1}.invoice-builder-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.9rem}.invoice-builder-grid label{display:grid;gap:.35rem;font-weight:700}.invoice-builder-grid input,.invoice-builder-grid textarea{width:100%;box-sizing:border-box;padding:.75rem;border:1px solid #cfd2d8;border-radius:.55rem;font:inherit}.invoice-wide{grid-column:1/-1}.money-input{display:flex;align-items:center;gap:.35rem;border:1px solid #cfd2d8;border-radius:.55rem;padding-left:.7rem}.money-input input{border:0;padding-left:0;outline:0}.invoice-builder-summary{margin:1rem 0;padding:.9rem;border-radius:.75rem;background:#f6f6f8;font-size:.9rem}.invoice-builder-summary p{margin:.3rem 0}.invoice-builder-message{min-height:1.2rem;color:#a00;font-weight:700}.invoice-builder-actions{display:flex;justify-content:flex-end;gap:.7rem}@media(max-width:700px){.invoice-builder-grid{grid-template-columns:1fr}.invoice-wide{grid-column:auto}}
+.admin-invoice-action{display:block;margin:.45rem 0 .2rem;padding:.45rem .65rem;border:1px solid #e82d7c;border-radius:.5rem;background:transparent;color:#e82d7c;font:inherit;font-size:.82rem;font-weight:800;cursor:pointer}.admin-invoice-action:hover{background:#fff0f6}.admin-invoice-help{font-size:.8rem;color:#666;max-width:290px}.admin-invoice-select{display:flex;align-items:center;gap:.4rem;margin:.45rem 0;font-size:.8rem;font-weight:800}.admin-invoice-select input{width:1rem;height:1rem;accent-color:#e82d7c}.combined-invoice-action{white-space:nowrap}.invoice-line-preview{margin:.8rem 0;padding:.8rem;border:1px solid #ddd;border-radius:.65rem;max-height:220px;overflow:auto}.invoice-line-preview article{display:grid;grid-template-columns:1fr auto;gap:.5rem;padding:.45rem 0;border-bottom:1px solid #eee}.invoice-line-preview article:last-child{border-bottom:0}.invoice-line-preview small{display:block;color:#666;margin-top:.2rem}.invoice-builder-dialog{width:min(720px,calc(100% - 2rem));max-height:calc(100vh - 2rem);border:0;border-radius:1rem;padding:0;box-shadow:0 24px 80px rgba(0,0,0,.28)}.invoice-builder-dialog::backdrop{background:rgba(0,0,0,.65)}.invoice-builder-form{padding:1.4rem}.invoice-builder-header{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:1rem}.invoice-builder-header h2{margin:.15rem 0}.invoice-builder-header p{margin:0}.invoice-dialog-close{border:0;background:transparent;font-size:2rem;cursor:pointer;line-height:1}.invoice-builder-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.9rem}.invoice-builder-grid label{display:grid;gap:.35rem;font-weight:700}.invoice-builder-grid input,.invoice-builder-grid textarea{width:100%;box-sizing:border-box;padding:.75rem;border:1px solid #cfd2d8;border-radius:.55rem;font:inherit}.invoice-wide{grid-column:1/-1}.money-input{display:flex;align-items:center;gap:.35rem;border:1px solid #cfd2d8;border-radius:.55rem;padding-left:.7rem}.money-input input{border:0;padding-left:0;outline:0}.invoice-builder-summary{margin:1rem 0;padding:.9rem;border-radius:.75rem;background:#f6f6f8;font-size:.9rem}.invoice-builder-summary p{margin:.3rem 0}.invoice-builder-message{min-height:1.2rem;color:#a00;font-weight:700}.invoice-builder-actions{display:flex;justify-content:flex-end;gap:.7rem}@media(max-width:700px){.invoice-builder-grid{grid-template-columns:1fr}.invoice-wide{grid-column:auto}}
 </style></head><body><header class="site-header"><div class="container nav-wrap"><a class="brand" href="index.html"><span class="brand-mark">HH</span><span>Hustle Hall <small>Transport</small></span></a><nav class="main-nav page-nav"><a href="index.html">Home</a><a href="driver.html">Driver Dashboard</a><a href="operations.html">Operations</a><a href="tracking.html">Tracking</a></nav></div></header><main class="page-main"><div class="container"><p class="eyebrow">Admin dashboard</p><h1 class="page-title">Manage requests.</h1><p class="dashboard-note">View every ride and delivery request, update its status, and open the Driver Dashboard when you are ready to complete a job.</p><div class="dashboard-stats" data-admin-stats></div><section class="promo-directory"><p class="eyebrow">Active promotions</p><h2>Promo codes</h2><div class="promo-code-grid"><article><strong>WELCOME10</strong><span>10% off any ride or delivery, up to $5.</span></article><article><strong>LOCAL5</strong><span>$5 off orders of $15 or more.</span></article><article class="promo-school"><strong>SCHOOL</strong><span>30% off eligible rides, up to $5 per ride.</span></article><article><strong>TKA</strong><span>45% off eligible orders, including multi-day ride estimates.</span></article><article><strong>TUESDAY5</strong><span>Automatically makes eligible one-way Tuesday rides $5 from 2 PM to 5 PM, up to 15 miles.</span></article></div><p class="promo-admin-note">Promo codes cannot be combined. TUESDAY5 is automatic and overrides other promo codes when a one-way ride qualifies. Multi-day ride requests receive a custom quote before payment.</p></section><div class="table-actions admin-filter-actions"><label>View requests<select data-admin-filter><option value="all">All requests</option><option value="active">Active</option><option value="pending">Pending approval</option><option value="today">Received today</option><option value="multi">Multi-day rides</option><option value="paid">Paid</option><option value="cancelled">Cancelled / rejected</option></select></label><button class="button button-secondary" data-export>Export CSV</button></div><div class="orders-table-wrap"><table><thead><tr><th>Order</th><th>Customer</th><th>Service</th><th>Total</th><th>Status</th><th>Action</th></tr></thead><tbody data-admin-orders></tbody></table></div><section class="admin-reviews-section"><div class="section-heading"><p class="eyebrow">Customer feedback</p><h2>Review moderation</h2><p>Approve reviews before they appear publicly, hide them, or remove them.</p></div><div class="table-actions"><button class="button button-secondary" type="button" data-refresh-reviews>Refresh Reviews</button></div><div class="orders-table-wrap"><table><thead><tr><th>Customer</th><th>Rating</th><th>Service</th><th>Review</th><th>Status</th><th>Action</th></tr></thead><tbody data-admin-reviews><tr><td colspan="6">Loading reviews…</td></tr></tbody></table></div><p class="review-message" data-admin-review-message aria-live="polite"></p></section></div></main><script>
 (function(){
   var body=document.querySelector('[data-admin-orders]'); if(!body)return;
+  var selected=new Set();
   function esc(v){return String(v==null?'':v).replace(/[&<>'"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]})}
   function numberFor(order){var d=new Date(),stamp=d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'),tail=String(order.id||Date.now()).replace(/\D/g,'').slice(-5)||String(Date.now()).slice(-5);return 'HHT-INV-'+stamp+'-'+tail}
   function token(){var b=new Uint8Array(18);crypto.getRandomValues(b);return Array.from(b,function(x){return x.toString(16).padStart(2,'0')}).join('')}
   function due(){var d=new Date();d.setDate(d.getDate()+7);return d.toISOString().slice(0,10)}
-  function invoiceUrl(order){if(!order||!order.invoice||!order.invoice.token)return '';var u=new URL('/invoice.html',location.origin);u.searchParams.set('id',order.id);u.searchParams.set('token',order.invoice.token);return u.toString()}
-  async function saveInvoice(order,invoice){var list=readOrders(),item=list.find(function(x){return x.id===order.id});if(!item)throw new Error('This ride is no longer available in the dashboard.');item.invoice=invoice;if(item.paymentStatus!=='Paid')item.paymentStatus='Invoice sent';saveOrders(list);var client=await hhtSupabaseReady;var result=await client.from('orders').update({payload:item}).eq('id',item.id);if(result.error)throw result.error;return item}
+  function invoiceUrl(order){var ref=order&&order.invoiceRef,host=ref&&ref.hostOrderId?readOrders().find(function(x){return x.id===ref.hostOrderId}):order;var inv=host&&host.invoice;if(!host||!inv||!inv.token)return '';var u=new URL('/invoice.html',location.origin);u.searchParams.set('id',host.id);u.searchParams.set('token',inv.token);return u.toString()}
+  function invoiceLocked(order){return Boolean(order.invoiceRef || (order.invoice&&order.invoice.token))}
+  async function persistOrders(changed){
+    saveOrders(changed);
+    var client=await hhtSupabaseReady;
+    for(var i=0;i<changed.length;i++){
+      var result=await client.from('orders').update({payload:changed[i]}).eq('id',changed[i].id);
+      if(result.error)throw result.error;
+    }
+  }
+  async function saveInvoice(order,invoice){
+    var list=readOrders(),item=list.find(function(x){return x.id===order.id});if(!item)throw new Error('This ride is no longer available in the dashboard.');
+    item.invoice=invoice;item.invoiceRef={hostOrderId:item.id,number:invoice.number,token:invoice.token};
+    if(item.paymentStatus!=='Paid')item.paymentStatus='Invoice sent';
+    await persistOrders([item]);return item
+  }
+  async function saveCombinedInvoice(orders,invoice){
+    var list=readOrders(),ids=orders.map(function(o){return o.id}),hostId=ids[0],host=list.find(function(x){return x.id===hostId});
+    if(!host)throw new Error('The first selected ride is no longer available.');
+    var changed=[];
+    ids.forEach(function(id){
+      var item=list.find(function(x){return x.id===id});if(!item)throw new Error('One selected ride is no longer available.');
+      if(invoiceLocked(item))throw new Error('One or more selected rides are already attached to an invoice.');
+      item.invoiceRef={hostOrderId:hostId,number:invoice.number,token:invoice.token};
+      if(item.paymentStatus!=='Paid')item.paymentStatus='Invoice sent';
+      changed.push(item);
+    });
+    host.invoice=invoice;
+    saveOrders(list);
+    var client=await hhtSupabaseReady;
+    for(var i=0;i<changed.length;i++){
+      var result=await client.from('orders').update({payload:changed[i]}).eq('id',changed[i].id);
+      if(result.error)throw result.error;
+    }
+    return host;
+  }
   function openBuilder(order){
     var ex=order.invoice||{},dialog=document.createElement('dialog');dialog.className='invoice-builder-dialog';
     var bill=ex.billTo||(String(order.promoCode||'').toUpperCase()==='TKA'?'The Kingdom Academy':(order.customerName||''));var desc=ex.description||((order.service==='package'?'Transportation / delivery service':'Ride transportation')+(order.date?' - '+order.date:''));var amt=Number(ex.amount!=null?ex.amount:(order.total||0)).toFixed(2);
@@ -23,13 +58,66 @@
       '<div class="invoice-builder-summary"><p><strong>Customer:</strong> '+esc(order.customerName||'Not provided')+'</p><p><strong>Route:</strong> '+esc(order.pickup||'Not provided')+' → '+esc(order.delivery||'Not provided')+'</p><p><strong>Payment:</strong> The printable invoice includes both a QR code and a payment link.</p></div>'+
       '<p class="invoice-builder-message" data-invoice-message aria-live="polite"></p><div class="invoice-builder-actions"><button type="button" class="button button-secondary" data-cancel-invoice>Cancel</button><button type="submit" class="button button-primary">Save & open invoice</button></div></form>';
     document.body.append(dialog);function close(){dialog.close()}dialog.querySelector('.invoice-dialog-close').addEventListener('click',close);dialog.querySelector('[data-cancel-invoice]').addEventListener('click',close);dialog.addEventListener('close',function(){dialog.remove()});
-    dialog.querySelector('form').addEventListener('submit',async function(e){e.preventDefault();var form=e.currentTarget,submit=form.querySelector('[type="submit"]'),msg=form.querySelector('[data-invoice-message]'),data=Object.fromEntries(new FormData(form)),amount=Number(data.amount);if(!Number.isFinite(amount)||amount<.5){msg.textContent='Enter an invoice amount of at least $0.50.';return}submit.disabled=true;submit.textContent='Saving invoice…';msg.textContent='';var inv={number:data.number.trim(),token:ex.token||token(),billTo:data.billTo.trim(),description:data.description.trim(),amount:Number(amount.toFixed(2)),serviceDate:data.serviceDate||'',dueDate:data.dueDate,notes:data.notes.trim(),issuedAt:ex.issuedAt||new Date().toISOString(),updatedAt:new Date().toISOString(),status:order.paymentStatus==='Paid'?'Paid':'Open'};try{var saved=await saveInvoice(order,inv),target=invoiceUrl(saved);close();window.open(target,'_blank','noopener');setTimeout(function(){if(typeof renderAdmin==='function')renderAdmin()},100)}catch(error){msg.textContent=error.message||'The invoice could not be saved.';submit.disabled=false;submit.textContent='Save & open invoice'}});
+    dialog.querySelector('form').addEventListener('submit',async function(e){e.preventDefault();var form=e.currentTarget,submit=form.querySelector('[type="submit"]'),msg=form.querySelector('[data-invoice-message]'),data=Object.fromEntries(new FormData(form)),amount=Number(data.amount);if(!Number.isFinite(amount)||amount<.5){msg.textContent='Enter an invoice amount of at least $0.50.';return}submit.disabled=true;submit.textContent='Saving invoice…';msg.textContent='';var inv={number:data.number.trim(),token:ex.token||token(),billTo:data.billTo.trim(),description:data.description.trim(),amount:Number(amount.toFixed(2)),serviceDate:data.serviceDate||'',dueDate:data.dueDate,notes:data.notes.trim(),issuedAt:ex.issuedAt||new Date().toISOString(),updatedAt:new Date().toISOString(),status:order.paymentStatus==='Paid'?'Paid':'Open',relatedOrderIds:[order.id],lineItems:[{orderId:order.id,customerName:order.customerName||'',description:data.description.trim(),serviceDate:data.serviceDate||order.date||'',pickup:order.pickup||'',delivery:order.delivery||'',amount:Number(amount.toFixed(2))}]};try{var saved=await saveInvoice(order,inv),target=invoiceUrl(saved);close();window.open(target,'_blank','noopener');setTimeout(function(){if(typeof renderAdmin==='function')renderAdmin()},100)}catch(error){msg.textContent=error.message||'The invoice could not be saved.';submit.disabled=false;submit.textContent='Save & open invoice'}});
     dialog.showModal();
   }
-  function decorate(){var orders=readOrders();body.querySelectorAll('tr').forEach(function(row){var link=row.querySelector('a[href^="receipt.html?id="]'),cell=row.lastElementChild;if(!link||!cell||cell.querySelector('[data-create-invoice]'))return;var u=new URL(link.href,location.href),id=u.searchParams.get('id'),order=orders.find(function(x){return x.id===id});if(!order||order.service!=='ride')return;var b=document.createElement('button');b.type='button';b.className='admin-invoice-action';b.dataset.createInvoice=order.id;b.textContent=order.invoice&&order.invoice.token?'View / edit invoice':'Create invoice';cell.insertBefore(b,cell.querySelector('.order-request-time')||null)})}
-  body.addEventListener('click',function(e){var b=e.target.closest('[data-create-invoice]');if(!b)return;var order=readOrders().find(function(x){return x.id===b.dataset.createInvoice});if(!order)return;if(order.invoice&&order.invoice.token&&!e.shiftKey){window.open(invoiceUrl(order),'_blank','noopener');return}openBuilder(order)});
+  function openCombinedBuilder(orders){
+    if(orders.length<2)return;
+    var dialog=document.createElement('dialog');dialog.className='invoice-builder-dialog';
+    var total=orders.reduce(function(sum,o){return sum+Number(o.total||0)},0);
+    var allTka=orders.every(function(o){return String(o.promoCode||'').toUpperCase()==='TKA'});
+    var firstDate=orders.map(function(o){return o.date||''}).filter(Boolean).sort()[0]||'';
+    dialog.innerHTML='<form class="invoice-builder-form"><div class="invoice-builder-header"><div><p class="eyebrow">Combined invoice</p><h2>Invoice '+orders.length+' rides together</h2><p>Each rider and route stays itemized.</p></div><button type="button" class="invoice-dialog-close" aria-label="Close">&times;</button></div><div class="invoice-builder-grid">'+
+      '<label>Invoice number<input name="number" required value="'+esc(numberFor(orders[0]))+'"></label>'+
+      '<label>Due date<input name="dueDate" type="date" required value="'+esc(due())+'"></label>'+
+      '<label class="invoice-wide">Bill to<input name="billTo" required placeholder="Business, school, parent, or organization" value="'+(allTka?'The Kingdom Academy':'')+'"></label>'+
+      '<label class="invoice-wide">Invoice description<input name="description" required value="Transportation services - '+orders.length+' rides"></label>'+
+      '<label class="invoice-wide">Notes<textarea name="notes" rows="3" placeholder="Optional note for the payer"></textarea></label></div>'+
+      '<div class="invoice-line-preview">'+orders.map(function(o){return '<article><div><strong>'+esc(o.customerName||'Customer')+'</strong><small>'+esc(o.id)+' · '+esc(o.date||'Date not set')+' · '+esc(o.pickup||'Pickup not provided')+' → '+esc(o.delivery||'Drop-off not provided')+'</small></div><strong>$'+Number(o.total||0).toFixed(2)+'</strong></article>'}).join('')+'</div>'+
+      '<div class="invoice-builder-summary"><p><strong>Rides:</strong> '+orders.length+'</p><p><strong>Total due:</strong> $'+total.toFixed(2)+'</p><p>All selected rides will be marked <strong>Invoice sent</strong> and cannot be added to another invoice.</p></div>'+
+      '<p class="invoice-builder-message" data-invoice-message aria-live="polite"></p><div class="invoice-builder-actions"><button type="button" class="button button-secondary" data-cancel-invoice>Cancel</button><button type="submit" class="button button-primary">Save & open combined invoice</button></div></form>';
+    document.body.append(dialog);function close(){dialog.close()}dialog.querySelector('.invoice-dialog-close').addEventListener('click',close);dialog.querySelector('[data-cancel-invoice]').addEventListener('click',close);dialog.addEventListener('close',function(){dialog.remove()});
+    dialog.querySelector('form').addEventListener('submit',async function(e){e.preventDefault();var form=e.currentTarget,submit=form.querySelector('[type="submit"]'),msg=form.querySelector('[data-invoice-message]'),data=Object.fromEntries(new FormData(form));
+      var lineItems=orders.map(function(o){return {orderId:o.id,customerName:o.customerName||'',description:'Ride transportation',serviceDate:o.date||'',pickup:o.pickup||'',delivery:o.delivery||'',amount:Number(Number(o.total||0).toFixed(2))}});
+      var amount=Number(lineItems.reduce(function(sum,x){return sum+x.amount},0).toFixed(2));if(amount<.5){msg.textContent='The selected rides do not have a billable total.';return}
+      submit.disabled=true;submit.textContent='Saving combined invoice…';msg.textContent='';
+      var inv={number:data.number.trim(),token:token(),billTo:data.billTo.trim(),description:data.description.trim(),amount:amount,serviceDate:firstDate,dueDate:data.dueDate,notes:data.notes.trim(),issuedAt:new Date().toISOString(),updatedAt:new Date().toISOString(),status:'Open',relatedOrderIds:orders.map(function(o){return o.id}),lineItems:lineItems};
+      try{var saved=await saveCombinedInvoice(orders,inv),target=invoiceUrl(saved);selected.clear();close();window.open(target,'_blank','noopener');setTimeout(function(){if(typeof renderAdmin==='function')renderAdmin();decorate();updateCombinedButton()},120)}catch(error){msg.textContent=error.message||'The combined invoice could not be saved.';submit.disabled=false;submit.textContent='Save & open combined invoice'}
+    });
+    dialog.showModal();
+  }
+  function updateCombinedButton(){
+    var b=document.querySelector('[data-combined-invoice]');if(!b)return;
+    var n=selected.size;b.disabled=n<2;b.textContent=n<2?'Combine rides into invoice':'Create combined invoice ('+n+')';
+  }
+  function decorate(){
+    var orders=readOrders();
+    Array.from(selected).forEach(function(id){var o=orders.find(function(x){return x.id===id});if(!o||invoiceLocked(o))selected.delete(id)});
+    body.querySelectorAll('tr').forEach(function(row){
+      var link=row.querySelector('a[href^="receipt.html?id="]'),cell=row.lastElementChild;if(!link||!cell)return;
+      var u=new URL(link.href,location.href),id=u.searchParams.get('id'),order=orders.find(function(x){return x.id===id});if(!order||order.service!=='ride')return;
+      if(!cell.querySelector('[data-create-invoice]')){
+        var b=document.createElement('button');b.type='button';b.className='admin-invoice-action';b.dataset.createInvoice=order.id;b.textContent=invoiceLocked(order)?'View invoice':'Create invoice';cell.insertBefore(b,cell.querySelector('.order-request-time')||null)
+      }
+      if(!cell.querySelector('[data-invoice-select]')){
+        var label=document.createElement('label');label.className='admin-invoice-select';
+        if(invoiceLocked(order)){label.innerHTML='<input type="checkbox" disabled> Invoiced';}
+        else{label.innerHTML='<input type="checkbox" data-invoice-select="'+esc(order.id)+'" '+(selected.has(order.id)?'checked':'')+'> Select for combined invoice';}
+        cell.insertBefore(label,cell.firstChild);
+      }
+    });updateCombinedButton()
+  }
+  body.addEventListener('change',function(e){var box=e.target.closest('[data-invoice-select]');if(!box)return;if(box.checked)selected.add(box.dataset.invoiceSelect);else selected.delete(box.dataset.invoiceSelect);updateCombinedButton()});
+  body.addEventListener('click',function(e){var b=e.target.closest('[data-create-invoice]');if(!b)return;var order=readOrders().find(function(x){return x.id===b.dataset.createInvoice});if(!order)return;if(invoiceLocked(order)){var target=invoiceUrl(order);if(target)window.open(target,'_blank','noopener');return}openBuilder(order)});
   new MutationObserver(decorate).observe(body,{childList:true,subtree:true});decorate();
-  var controls=document.querySelector('.admin-filter-actions');if(controls&&!controls.querySelector('[data-new-invoice-help]')){var h=document.createElement('span');h.className='admin-invoice-help';h.dataset.newInvoiceHelp='';h.textContent='Create an invoice from any ride using the button in its Action column.';controls.append(h)}
+  var controls=document.querySelector('.admin-filter-actions');
+  if(controls&&!controls.querySelector('[data-combined-invoice]')){
+    var combine=document.createElement('button');combine.type='button';combine.className='button button-primary combined-invoice-action';combine.dataset.combinedInvoice='';combine.disabled=true;combine.textContent='Combine rides into invoice';
+    combine.addEventListener('click',function(){var orders=readOrders().filter(function(o){return selected.has(o.id)&&o.service==='ride'&&!invoiceLocked(o)});if(orders.length>=2)openCombinedBuilder(orders)});
+    controls.append(combine);
+    var h=document.createElement('span');h.className='admin-invoice-help';h.dataset.newInvoiceHelp='';h.textContent='Select two or more uninvoiced rides, then create one itemized invoice for the payer.';controls.append(h)
+  }
+  updateCombinedButton();
 })();
 </script></body></html>
 
