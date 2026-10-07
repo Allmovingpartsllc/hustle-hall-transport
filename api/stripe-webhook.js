@@ -1,40 +1,76 @@
 const Stripe = require('stripe');
 
-async function updatePaymentStatus(session, paymentStatus) {
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !session.metadata?.bookingId) return;
-  const orderUrl = `https://ucopmutxwsrgnudsyuhz.supabase.co/rest/v1/orders?id=eq.${encodeURIComponent(session.metadata.bookingId)}&select=payload`;
-  const headers = {
+const SUPABASE_URL = 'https://ucopmutxwsrgnudsyuhz.supabase.co';
+
+function headers() {
+  return {
     apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
     Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
     'Content-Type': 'application/json'
   };
-  const lookup = await fetch(orderUrl, { headers });
-  if (!lookup.ok) throw new Error('Could not find the booking to update payment status.');
-  const [booking] = await lookup.json();
-  if (!booking) return;
+}
 
-  const currentPayload = booking.payload || {};
-  const paidAt = paymentStatus === 'Paid' ? new Date().toLocaleString() : undefined;
-  const payload = {
-    ...currentPayload,
-    paymentStatus,
-    stripeSessionId: session.id,
-    paidAt
-  };
-  if (currentPayload.invoice && session.metadata?.paymentType === 'invoice') {
-    payload.invoice = {
-      ...currentPayload.invoice,
-      status: paymentStatus === 'Paid' ? 'Paid' : currentPayload.invoice.status,
-      paidAt: paidAt || currentPayload.invoice.paidAt,
-      stripeSessionId: session.id
-    };
-  }
-  const update = await fetch(orderUrl, {
+async function loadOrder(id) {
+  const url = `${SUPABASE_URL}/rest/v1/orders?id=eq.${encodeURIComponent(id)}&select=id,payload`;
+  const response = await fetch(url, { headers: headers() });
+  if (!response.ok) throw new Error('Could not find the booking to update payment status.');
+  const rows = await response.json();
+  return rows[0];
+}
+
+async function saveOrder(id, payload) {
+  const url = `${SUPABASE_URL}/rest/v1/orders?id=eq.${encodeURIComponent(id)}`;
+  const update = await fetch(url, {
     method: 'PATCH',
-    headers: { ...headers, Prefer: 'return=minimal' },
+    headers: { ...headers(), Prefer: 'return=minimal' },
     body: JSON.stringify({ payload })
   });
   if (!update.ok) throw new Error('Could not save payment status.');
+}
+
+async function updatePaymentStatus(session, paymentStatus) {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !session.metadata?.bookingId) return;
+
+  const host = await loadOrder(session.metadata.bookingId);
+  if (!host) return;
+  const hostPayload = host.payload || {};
+  const invoice = hostPayload.invoice || {};
+  const relatedIds = session.metadata?.paymentType === 'invoice' && Array.isArray(invoice.relatedOrderIds) && invoice.relatedOrderIds.length
+    ? invoice.relatedOrderIds.map(String)
+    : [session.metadata.bookingId];
+
+  const paidAt = paymentStatus === 'Paid' ? new Date().toLocaleString() : undefined;
+
+  for (const orderId of relatedIds) {
+    const row = orderId === host.id ? host : await loadOrder(orderId);
+    if (!row) continue;
+    const currentPayload = row.payload || {};
+    const payload = {
+      ...currentPayload,
+      paymentStatus,
+      stripeSessionId: session.id,
+      paidAt
+    };
+
+    if (orderId === host.id && currentPayload.invoice && session.metadata?.paymentType === 'invoice') {
+      payload.invoice = {
+        ...currentPayload.invoice,
+        status: paymentStatus === 'Paid' ? 'Paid' : currentPayload.invoice.status,
+        paidAt: paidAt || currentPayload.invoice.paidAt,
+        stripeSessionId: session.id
+      };
+    }
+
+    if (currentPayload.invoiceRef && session.metadata?.paymentType === 'invoice') {
+      payload.invoiceRef = {
+        ...currentPayload.invoiceRef,
+        paymentStatus,
+        paidAt: paidAt || currentPayload.invoiceRef.paidAt
+      };
+    }
+
+    await saveOrder(orderId, payload);
+  }
 }
 
 module.exports = async function handler(req, res) {
