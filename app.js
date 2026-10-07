@@ -437,7 +437,7 @@ function renderAdmin() {
   const delivered = orders.filter((order) => ['Delivered', 'Completed'].includes(order.status));
   const visibleOrders = getAdminFilteredOrders(orders);
   document.querySelector('[data-admin-stats]').innerHTML = `<article class="stat-card"><span>Total requests</span><strong>${orders.length}</strong></article><article class="stat-card"><span>Active requests</span><strong>${orders.filter((order) => !['Delivered', 'Completed', 'Rejected', 'Cancelled'].includes(order.status)).length}</strong></article><article class="stat-card"><span>Delivered revenue</span><strong>${money(delivered.reduce((sum, order) => sum + Number(order.total || 0), 0))}</strong></article>`;
-  body.innerHTML = visibleOrders.length ? visibleOrders.map((order) => `<tr><td><a href="receipt.html?id=${encodeURIComponent(order.id)}">${escapePortalText(order.id)}</a></td><td>${escapePortalText(order.customerName)}<br><small>${escapePortalText(order.phone)}</small></td><td>${escapePortalText(order.service)}</td><td>${order.preApprovalEstimate ? `Est. ${money(order.total)}` : (order.total ? money(order.total) : 'TBD')}</td><td><select data-status="${escapePortalText(order.id)}">${statuses.map((status) => `<option ${status === order.status ? 'selected' : ''}>${status}</option>`).join('')}</select></td><td><a href="receipt.html?id=${encodeURIComponent(order.id)}">Receipt</a><small class="order-request-time">Received: ${escapePortalText(order.createdAt || 'Not available')}</small><small class="order-completed-time">Completed: ${escapePortalText(order.completedAt || 'Not completed')}</small></td></tr>`).join('') : '<tr><td colspan="6">No requests match this filter.</td></tr>';
+  body.innerHTML = visibleOrders.length ? visibleOrders.map((order) => `<tr><td><a class="admin-order-link" data-order-details="${escapePortalText(order.id)}" href="receipt.html?id=${encodeURIComponent(order.id)}" aria-label="View details for order ${escapePortalText(order.id)}">${escapePortalText(order.id)}</a></td><td>${escapePortalText(order.customerName)}<br><small>${escapePortalText(order.phone)}</small></td><td>${escapePortalText(order.service)}</td><td>${order.preApprovalEstimate ? `Est. ${money(order.total)}` : (order.total ? money(order.total) : 'TBD')}</td><td><select data-status="${escapePortalText(order.id)}">${statuses.map((status) => `<option ${status === order.status ? 'selected' : ''}>${status}</option>`).join('')}</select></td><td><a href="receipt.html?id=${encodeURIComponent(order.id)}">Receipt</a><small class="order-request-time">Received: ${escapePortalText(order.createdAt || 'Not available')}</small><small class="order-completed-time">Completed: ${escapePortalText(order.completedAt || 'Not completed')}</small></td></tr>`).join('') : '<tr><td colspan="6">No requests match this filter.</td></tr>';
   body.querySelectorAll('[data-status]').forEach((element) => element.addEventListener('change', async () => {
     const nextStatus = element.value;
     const list = readOrders();
@@ -514,20 +514,20 @@ function openAdminOrderDetails(order) {
     const isAddress = label === 'Pickup address' || label === 'Delivery address';
     const content = isAddress && value ? `<a class="address-map-link" href="${mapsLink(value)}" target="_blank" rel="noopener noreferrer">${escapePortalText(value)}<small>Open in Google Maps ?</small></a>` : escapePortalText(value);
     return `<div><span>${escapePortalText(label)}</span><strong>${content}</strong></div>`;
-  }).join('')}</div>${order.deliveryProof ? `<section class="delivery-proof"><h3>Proof of delivery</h3><p><strong>Signed by:</strong> ${escapePortalText(order.deliveryProof.signedBy || 'Not recorded')}</p>${order.deliveryProof.photo ? `<img src="${order.deliveryProof.photo}" alt="Delivery proof photo for ${escapePortalText(order.id)}">` : ''}${order.deliveryProof.signature ? `<img class="delivery-signature" src="${order.deliveryProof.signature}" alt="Customer signature">` : ''}</section>` : ''}<div class="order-details-actions"><a class="button button-primary" href="${calendarLink()}" target="_blank" rel="noopener noreferrer">Add to Google Calendar</a><a class="button button-secondary" href="receipt.html?id=${encodeURIComponent(order.id)}">Open receipt</a><button type="button" class="button button-secondary">Close</button></div>`;
+  }).join('')}</div>${order.deliveryProof ? `<section class="delivery-proof"><h3>Proof of delivery</h3><p><strong>Signed by:</strong> ${escapePortalText(order.deliveryProof.signedBy || 'Not recorded')}</p>${order.deliveryProof.photo ? `<img src="${order.deliveryProof.photo}" alt="Delivery proof photo for ${escapePortalText(order.id)}">` : ''}${order.deliveryProof.signature ? `<img class="delivery-signature" src="${order.deliveryProof.signature}" alt="Customer signature">` : ''}</section>` : ''}<div class="order-details-actions"><a class="button button-primary" href="${calendarLink()}" target="_blank" rel="noopener noreferrer">Add to Google Calendar</a><a class="button button-secondary" href="receipt.html?id=${encodeURIComponent(order.id)}">Open receipt</a><button type="button" class="button button-secondary" data-close-order-details>Close</button></div>`;
   document.body.append(dialog);
   const close = () => dialog.close();
   dialog.querySelector('.order-details-close').addEventListener('click', close);
-  dialog.querySelector('.button-secondary').addEventListener('click', close);
+  dialog.querySelector('[data-close-order-details]').addEventListener('click', close);
   dialog.addEventListener('close', () => dialog.remove());
   dialog.showModal();
 }
 
 document.addEventListener('click', (event) => {
-  const orderLink = event.target.closest('[data-admin-orders] td:first-child a');
+  const orderLink = event.target.closest('[data-order-details], [data-admin-orders] td:first-child a');
   if (!orderLink) return;
   event.preventDefault();
-  const orderId = new URL(orderLink.href).searchParams.get('id');
+  const orderId = orderLink.dataset.orderDetails || new URL(orderLink.href, location.href).searchParams.get('id');
   const order = readOrders().find((savedOrder) => savedOrder.id === orderId);
   if (order) openAdminOrderDetails(order);
 });
