@@ -150,6 +150,7 @@
     var combine=document.createElement('button');combine.type='button';combine.className='button button-primary combined-invoice-action';combine.dataset.combinedInvoice='';combine.disabled=true;combine.textContent='Combine rides into invoice';
     combine.addEventListener('click',function(){var orders=readOrders().filter(function(o){return selected.has(o.id)&&o.service==='ride'&&!invoiceLocked(o)});if(orders.length>=2)openCombinedBuilder(orders)});
     controls.append(combine);
+    var groupsButton=document.createElement('button');groupsButton.type='button';groupsButton.className='button button-secondary';groupsButton.textContent='Billing Groups';groupsButton.addEventListener('click',billModal);controls.append(groupsButton);
     var h=document.createElement('span');h.className='admin-invoice-help';h.dataset.newInvoiceHelp='';h.textContent='Select two or more uninvoiced rides, then create one itemized invoice for the payer.';controls.append(h)
   }
   updateCombinedButton();
