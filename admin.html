@@ -105,6 +105,147 @@
     });
     dialog.showModal();
   }
+
+  // Suggestions are only clues. Never merge rides automatically based on shared details.
+  function matchKey(value){return String(value||'').normalize('NFKD').toLowerCase().replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ')}
+  function lastName(order){var name=matchKey(order.customerName||'');var parts=name.split(' ').filter(Boolean);return parts.length>1?parts[parts.length-1]:''}
+  function reasonsFor(a,b){
+    var reasons=[];
+    var surname=lastName(a);if(surname&&surname===lastName(b))reasons.push('Same last name: '+surname);
+    var promo=matchKey(a.promoCode);if(promo&&promo===matchKey(b.promoCode))reasons.push('Same promo code: '+String(a.promoCode).toUpperCase());
+    var destination=matchKey(a.delivery);if(destination&&destination.length>=6&&destination===matchKey(b.delivery))reasons.push('Same drop-off: '+(a.delivery||''));
+    return reasons;
+  }
+  function isInvoiceCandidate(order){return order&&order.service==='ride'&&!invoiceLocked(order)&&String(order.paymentStatus||'').toLowerCase()!=='paid'}
+  function openRelatedRides(seedId){
+    var all=readOrders(),seed=all.find(function(o){return o.id===seedId});
+    if(!isInvoiceCandidate(seed)){alert('This ride has already been invoiced or paid and cannot be combined.');return}
+    var matches=all.filter(function(o){return o.id!==seed.id&&isInvoiceCandidate(o)}).map(function(o){return {order:o,reasons:reasonsFor(seed,o)}}).filter(function(item){return item.reasons.length}).sort(function(a,b){return b.reasons.length-a.reasons.length||String(b.order.date||'').localeCompare(String(a.order.date||''))}).slice(0,100);
+    var chosen=new Set([seed.id]),dialog=document.createElement('dialog');dialog.className='invoice-builder-dialog';
+    dialog.innerHTML='<div class="invoice-builder-form"><div class="invoice-builder-header"><div><p class="eyebrow">Related ride finder</p><h2>Potential invoice matches</h2><p>Matching details are suggestions, not proof of a shared payer. Confirm authorization before combining.</p></div><button type="button" class="invoice-dialog-close" aria-label="Close">&times;</button></div>'+
+      '<div class="invoice-line-preview"><article><div><strong>Starting ride: '+esc(seed.customerName||'Customer')+'</strong><small>'+esc(seed.id)+' · '+esc(seed.delivery||'Destination unavailable')+'</small></div><strong>
+    var b=document.querySelector('[data-combined-invoice]');if(!b)return;
+    var n=selected.size;b.disabled=n<2;b.textContent=n<2?'Combine rides into invoice':'Create combined invoice ('+n+')';
+  }
+  function decorate(){
+    var orders=readOrders();
+    Array.from(selected).forEach(function(id){var o=orders.find(function(x){return x.id===id});if(!o||invoiceLocked(o))selected.delete(id)});
+    body.querySelectorAll('tr').forEach(function(row){
+      var link=row.querySelector('a[href^="receipt.html?id="]'),cell=row.lastElementChild;if(!link||!cell)return;
+      var u=new URL(link.href,location.href),id=u.searchParams.get('id'),order=orders.find(function(x){return x.id===id});if(!order||order.service!=='ride')return;
+      if(!cell.querySelector('[data-create-invoice]')){
+        var b=document.createElement('button');b.type='button';b.className='admin-invoice-action';b.dataset.createInvoice=order.id;b.textContent=invoiceLocked(order)?'View invoice':'Create invoice';cell.insertBefore(b,cell.querySelector('.order-request-time')||null)
+      }
+      if(isInvoiceCandidate(order)&&!cell.querySelector('[data-find-related]')){
+        var find=document.createElement('button');find.type='button';find.className='admin-invoice-action';find.dataset.findRelated=order.id;find.textContent='Find related rides';cell.insertBefore(find,cell.querySelector('.order-request-time')||null);
+      }
+      if(!cell.querySelector('[data-invoice-select]')){
+        var label=document.createElement('label');label.className='admin-invoice-select';
+        if(invoiceLocked(order)){label.innerHTML='<input type="checkbox" disabled> Invoiced';}
+        else{label.innerHTML='<input type="checkbox" data-invoice-select="'+esc(order.id)+'" '+(selected.has(order.id)?'checked':'')+'> Select for combined invoice';}
+        cell.insertBefore(label,cell.firstChild);
+      }
+    });updateCombinedButton()
+  }
+  body.addEventListener('change',function(e){var box=e.target.closest('[data-invoice-select]');if(!box)return;if(box.checked)selected.add(box.dataset.invoiceSelect);else selected.delete(box.dataset.invoiceSelect);updateCombinedButton()});
+  body.addEventListener('click',function(e){var match=e.target.closest('[data-find-related]');if(match)openRelatedRides(match.dataset.findRelated)});
+  body.addEventListener('click',function(e){var b=e.target.closest('[data-create-invoice]');if(!b)return;var order=readOrders().find(function(x){return x.id===b.dataset.createInvoice});if(!order)return;if(invoiceLocked(order)){var target=invoiceUrl(order);if(target)window.open(target,'_blank','noopener');return}openBuilder(order)});
+  new MutationObserver(decorate).observe(body,{childList:true,subtree:true});decorate();
+  var controls=document.querySelector('.admin-filter-actions');
+  if(controls&&!controls.querySelector('[data-combined-invoice]')){
+    var combine=document.createElement('button');combine.type='button';combine.className='button button-primary combined-invoice-action';combine.dataset.combinedInvoice='';combine.disabled=true;combine.textContent='Combine rides into invoice';
+    combine.addEventListener('click',function(){var orders=readOrders().filter(function(o){return selected.has(o.id)&&o.service==='ride'&&!invoiceLocked(o)});if(orders.length>=2)openCombinedBuilder(orders)});
+    controls.append(combine);
+    var h=document.createElement('span');h.className='admin-invoice-help';h.dataset.newInvoiceHelp='';h.textContent='Select two or more uninvoiced rides, then create one itemized invoice for the payer.';controls.append(h)
+  }
+  updateCombinedButton();
+})();
+</script></body></html>
+
++Number(seed.total||0).toFixed(2)+'</strong></article>'+
+      (matches.length?matches.map(function(m){var o=m.order;return '<article><label class="admin-invoice-select" style="align-items:flex-start"><input type="checkbox" data-related-id="'+esc(o.id)+'"><span><strong>'+esc(o.customerName||'Customer')+'</strong><small>'+esc(o.id)+' · '+esc(o.date||'Date not set')+' · '+esc(o.delivery||'Destination unavailable')+'</small><small>'+esc(m.reasons.join(' • '))+'</small></span></label><strong>
+    var b=document.querySelector('[data-combined-invoice]');if(!b)return;
+    var n=selected.size;b.disabled=n<2;b.textContent=n<2?'Combine rides into invoice':'Create combined invoice ('+n+')';
+  }
+  function decorate(){
+    var orders=readOrders();
+    Array.from(selected).forEach(function(id){var o=orders.find(function(x){return x.id===id});if(!o||invoiceLocked(o))selected.delete(id)});
+    body.querySelectorAll('tr').forEach(function(row){
+      var link=row.querySelector('a[href^="receipt.html?id="]'),cell=row.lastElementChild;if(!link||!cell)return;
+      var u=new URL(link.href,location.href),id=u.searchParams.get('id'),order=orders.find(function(x){return x.id===id});if(!order||order.service!=='ride')return;
+      if(!cell.querySelector('[data-create-invoice]')){
+        var b=document.createElement('button');b.type='button';b.className='admin-invoice-action';b.dataset.createInvoice=order.id;b.textContent=invoiceLocked(order)?'View invoice':'Create invoice';cell.insertBefore(b,cell.querySelector('.order-request-time')||null)
+      }
+      if(!cell.querySelector('[data-invoice-select]')){
+        var label=document.createElement('label');label.className='admin-invoice-select';
+        if(invoiceLocked(order)){label.innerHTML='<input type="checkbox" disabled> Invoiced';}
+        else{label.innerHTML='<input type="checkbox" data-invoice-select="'+esc(order.id)+'" '+(selected.has(order.id)?'checked':'')+'> Select for combined invoice';}
+        cell.insertBefore(label,cell.firstChild);
+      }
+    });updateCombinedButton()
+  }
+  body.addEventListener('change',function(e){var box=e.target.closest('[data-invoice-select]');if(!box)return;if(box.checked)selected.add(box.dataset.invoiceSelect);else selected.delete(box.dataset.invoiceSelect);updateCombinedButton()});
+  body.addEventListener('click',function(e){var b=e.target.closest('[data-create-invoice]');if(!b)return;var order=readOrders().find(function(x){return x.id===b.dataset.createInvoice});if(!order)return;if(invoiceLocked(order)){var target=invoiceUrl(order);if(target)window.open(target,'_blank','noopener');return}openBuilder(order)});
+  new MutationObserver(decorate).observe(body,{childList:true,subtree:true});decorate();
+  var controls=document.querySelector('.admin-filter-actions');
+  if(controls&&!controls.querySelector('[data-combined-invoice]')){
+    var combine=document.createElement('button');combine.type='button';combine.className='button button-primary combined-invoice-action';combine.dataset.combinedInvoice='';combine.disabled=true;combine.textContent='Combine rides into invoice';
+    combine.addEventListener('click',function(){var orders=readOrders().filter(function(o){return selected.has(o.id)&&o.service==='ride'&&!invoiceLocked(o)});if(orders.length>=2)openCombinedBuilder(orders)});
+    controls.append(combine);
+    var h=document.createElement('span');h.className='admin-invoice-help';h.dataset.newInvoiceHelp='';h.textContent='Select two or more uninvoiced rides, then create one itemized invoice for the payer.';controls.append(h)
+  }
+  updateCombinedButton();
+})();
+</script></body></html>
+
++Number(o.total||0).toFixed(2)+'</strong></article>'}).join(''):'<p>No matching, uninvoiced rides were found. You can still select rides manually in the dashboard.</p>')+'</div>'+
+      '<p class="invoice-builder-message" data-related-summary aria-live="polite"></p><div class="invoice-builder-actions"><button type="button" class="button button-secondary" data-related-close>Cancel</button><button type="button" class="button button-primary" data-related-combine disabled>Create combined invoice</button></div></div>';
+    document.body.append(dialog);
+    var summary=dialog.querySelector('[data-related-summary]'),submit=dialog.querySelector('[data-related-combine]');
+    function refresh(){var list=all.filter(function(o){return chosen.has(o.id)});var total=list.reduce(function(sum,o){return sum+Number(o.total||0)},0);summary.textContent=list.length+' ride(s) selected · 
+    var b=document.querySelector('[data-combined-invoice]');if(!b)return;
+    var n=selected.size;b.disabled=n<2;b.textContent=n<2?'Combine rides into invoice':'Create combined invoice ('+n+')';
+  }
+  function decorate(){
+    var orders=readOrders();
+    Array.from(selected).forEach(function(id){var o=orders.find(function(x){return x.id===id});if(!o||invoiceLocked(o))selected.delete(id)});
+    body.querySelectorAll('tr').forEach(function(row){
+      var link=row.querySelector('a[href^="receipt.html?id="]'),cell=row.lastElementChild;if(!link||!cell)return;
+      var u=new URL(link.href,location.href),id=u.searchParams.get('id'),order=orders.find(function(x){return x.id===id});if(!order||order.service!=='ride')return;
+      if(!cell.querySelector('[data-create-invoice]')){
+        var b=document.createElement('button');b.type='button';b.className='admin-invoice-action';b.dataset.createInvoice=order.id;b.textContent=invoiceLocked(order)?'View invoice':'Create invoice';cell.insertBefore(b,cell.querySelector('.order-request-time')||null)
+      }
+      if(!cell.querySelector('[data-invoice-select]')){
+        var label=document.createElement('label');label.className='admin-invoice-select';
+        if(invoiceLocked(order)){label.innerHTML='<input type="checkbox" disabled> Invoiced';}
+        else{label.innerHTML='<input type="checkbox" data-invoice-select="'+esc(order.id)+'" '+(selected.has(order.id)?'checked':'')+'> Select for combined invoice';}
+        cell.insertBefore(label,cell.firstChild);
+      }
+    });updateCombinedButton()
+  }
+  body.addEventListener('change',function(e){var box=e.target.closest('[data-invoice-select]');if(!box)return;if(box.checked)selected.add(box.dataset.invoiceSelect);else selected.delete(box.dataset.invoiceSelect);updateCombinedButton()});
+  body.addEventListener('click',function(e){var b=e.target.closest('[data-create-invoice]');if(!b)return;var order=readOrders().find(function(x){return x.id===b.dataset.createInvoice});if(!order)return;if(invoiceLocked(order)){var target=invoiceUrl(order);if(target)window.open(target,'_blank','noopener');return}openBuilder(order)});
+  new MutationObserver(decorate).observe(body,{childList:true,subtree:true});decorate();
+  var controls=document.querySelector('.admin-filter-actions');
+  if(controls&&!controls.querySelector('[data-combined-invoice]')){
+    var combine=document.createElement('button');combine.type='button';combine.className='button button-primary combined-invoice-action';combine.dataset.combinedInvoice='';combine.disabled=true;combine.textContent='Combine rides into invoice';
+    combine.addEventListener('click',function(){var orders=readOrders().filter(function(o){return selected.has(o.id)&&o.service==='ride'&&!invoiceLocked(o)});if(orders.length>=2)openCombinedBuilder(orders)});
+    controls.append(combine);
+    var h=document.createElement('span');h.className='admin-invoice-help';h.dataset.newInvoiceHelp='';h.textContent='Select two or more uninvoiced rides, then create one itemized invoice for the payer.';controls.append(h)
+  }
+  updateCombinedButton();
+})();
+</script></body></html>
+
++total.toFixed(2)+' total. Each rider will remain itemized.';submit.disabled=list.length<2}
+    dialog.querySelectorAll('[data-related-id]').forEach(function(box){box.addEventListener('change',function(){if(box.checked)chosen.add(box.dataset.relatedId);else chosen.delete(box.dataset.relatedId);refresh()})});
+    function close(){dialog.close()}
+    dialog.querySelector('.invoice-dialog-close').addEventListener('click',close);
+    dialog.querySelector('[data-related-close]').addEventListener('click',close);
+    dialog.addEventListener('close',function(){dialog.remove()});
+    submit.addEventListener('click',function(){var current=readOrders(),orders=current.filter(function(o){return chosen.has(o.id)&&isInvoiceCandidate(o)});if(orders.length!==chosen.size){summary.textContent='One of these rides is no longer eligible. Close and refresh the matches.';return}close();openCombinedBuilder(orders)});
+    refresh();dialog.showModal();
+  }
   function updateCombinedButton(){
     var b=document.querySelector('[data-combined-invoice]');if(!b)return;
     var n=selected.size;b.disabled=n<2;b.textContent=n<2?'Combine rides into invoice':'Create combined invoice ('+n+')';
