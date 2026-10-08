@@ -106,113 +106,20 @@
     dialog.showModal();
   }
 
-  function normBilling(v){return String(v||'').normalize('NFKD').toLowerCase().replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim()}
-  function eligibleBilling(o){return o&&o.service==='ride'&&!invoiceLocked(o)&&String(o.paymentStatus||'').toLowerCase()!=='paid'}
-  function billingSurname(o){var a=normBilling(o.customerName).split(' ').filter(Boolean);return a.length>1?a[a.length-1]:''}
-  function matchBilling(a,b){var result=[],surname=billingSurname(a);if(surname&&surname===billingSurname(b))result.push('Same last name');if(normBilling(a.promoCode)&&normBilling(a.promoCode)===normBilling(b.promoCode))result.push('Same promo code: '+a.promoCode);if(normBilling(a.delivery).length>5&&normBilling(a.delivery)===normBilling(b.delivery))result.push('Same drop-off');return result}
-  function findRelatedBilling(id){
-    var orders=readOrders(),seed=orders.find(function(o){return o.id===id});if(!eligibleBilling(seed))return;
-    var items=orders.filter(function(o){return o.id!==seed.id&&eligibleBilling(o)}).map(function(o){return {order:o,reasons:matchBilling(seed,o)}}).filter(function(x){return x.reasons.length>0}).sort(function(a,b){return b.reasons.length-a.reasons.length}).slice(0,100);
-    var selectedIds=new Set([seed.id]),d=document.createElement('dialog');d.className='invoice-builder-dialog';
-    d.innerHTML='<div class="invoice-builder-form"><div class="invoice-builder-header"><div><h2>Related rides</h2><p>These are suggestions only. Confirm the responsible payer before invoicing.</p></div><button class="invoice-dialog-close" type="button">×</button></div><div class="invoice-line-preview">'+
-      items.map(function(x){var o=x.order;return '<article><label class="admin-invoice-select"><input type="checkbox" data-match-id="'+esc(o.id)+'"><span><strong>'+esc(o.customerName||'Customer')+'</strong><small>'+esc(o.id)+' · '+esc(x.reasons.join(', '))+'</small></span></label><strong>
-    var b=document.querySelector('[data-combined-invoice]');if(!b)return;
-    var n=selected.size;b.disabled=n<2;b.textContent=n<2?'Combine rides into invoice':'Create combined invoice ('+n+')';
-  }
-  function decorate(){
-    var orders=readOrders();
-    Array.from(selected).forEach(function(id){var o=orders.find(function(x){return x.id===id});if(!o||invoiceLocked(o))selected.delete(id)});
-    body.querySelectorAll('tr').forEach(function(row){
-      var link=row.querySelector('a[href^="receipt.html?id="]'),cell=row.lastElementChild;if(!link||!cell)return;
-      var u=new URL(link.href,location.href),id=u.searchParams.get('id'),order=orders.find(function(x){return x.id===id});if(!order||order.service!=='ride')return;
-      if(!cell.querySelector('[data-create-invoice]')){
-        var b=document.createElement('button');b.type='button';b.className='admin-invoice-action';b.dataset.createInvoice=order.id;b.textContent=invoiceLocked(order)?'View invoice':'Create invoice';cell.insertBefore(b,cell.querySelector('.order-request-time')||null)
-      }
-      if(eligibleBilling(order)&&!cell.querySelector('[data-related-button]')){var rel=document.createElement('button');rel.type='button';rel.className='admin-invoice-action';rel.dataset.relatedButton=order.id;rel.textContent='Find related rides';cell.insertBefore(rel,cell.querySelector('.order-request-time')||null)}
-      if(!cell.querySelector('[data-invoice-select]')){
-        var label=document.createElement('label');label.className='admin-invoice-select';
-        if(invoiceLocked(order)){label.innerHTML='<input type="checkbox" disabled> Invoiced';}
-        else{label.innerHTML='<input type="checkbox" data-invoice-select="'+esc(order.id)+'" '+(selected.has(order.id)?'checked':'')+'> Select for combined invoice';}
-        cell.insertBefore(label,cell.firstChild);
-      }
-    });updateCombinedButton()
-  }
-  body.addEventListener('change',function(e){var box=e.target.closest('[data-invoice-select]');if(!box)return;if(box.checked)selected.add(box.dataset.invoiceSelect);else selected.delete(box.dataset.invoiceSelect);updateCombinedButton()});
-  body.addEventListener('click',function(e){var b=e.target.closest('[data-related-button]');if(b)findRelatedBilling(b.dataset.relatedButton)});
-  body.addEventListener('click',function(e){var b=e.target.closest('[data-create-invoice]');if(!b)return;var order=readOrders().find(function(x){return x.id===b.dataset.createInvoice});if(!order)return;if(invoiceLocked(order)){var target=invoiceUrl(order);if(target)window.open(target,'_blank','noopener');return}openBuilder(order)});
-  new MutationObserver(decorate).observe(body,{childList:true,subtree:true});decorate();
-  var controls=document.querySelector('.admin-filter-actions');
-  if(controls&&!controls.querySelector('[data-combined-invoice]')){
-    var combine=document.createElement('button');combine.type='button';combine.className='button button-primary combined-invoice-action';combine.dataset.combinedInvoice='';combine.disabled=true;combine.textContent='Combine rides into invoice';
-    combine.addEventListener('click',function(){var orders=readOrders().filter(function(o){return selected.has(o.id)&&o.service==='ride'&&!invoiceLocked(o)});if(orders.length>=2)openCombinedBuilder(orders)});
-    controls.append(combine);
-    var groupsButton=document.createElement('button');groupsButton.type='button';groupsButton.className='button button-secondary';groupsButton.textContent='Billing Groups';groupsButton.addEventListener('click',showBillingGroups);controls.append(groupsButton);
-    var h=document.createElement('span');h.className='admin-invoice-help';h.dataset.newInvoiceHelp='';h.textContent='Select two or more uninvoiced rides, then create one itemized invoice for the payer.';controls.append(h)
-  }
-  updateCombinedButton();
-})();
-</script></body></html>
 
-+Number(o.total||0).toFixed(2)+'</strong></article>'}).join('')+
-      (items.length?'':'<p>No matching uninvoiced rides found. Use manual selection instead.</p>')+'</div><div class="invoice-builder-actions"><button class="button button-primary" data-match-create disabled>Create combined invoice</button></div></div>';
-    document.body.append(d);d.querySelector('.invoice-dialog-close').onclick=function(){d.close()};d.addEventListener('close',function(){d.remove()});
-    var create=d.querySelector('[data-match-create]');d.querySelectorAll('[data-match-id]').forEach(function(c){c.addEventListener('change',function(){if(c.checked)selectedIds.add(c.dataset.matchId);else selectedIds.delete(c.dataset.matchId);create.disabled=selectedIds.size<2})});
-    create.onclick=function(){var rides=readOrders().filter(function(o){return selectedIds.has(o.id)&&eligibleBilling(o)});if(rides.length!==selectedIds.size)return;d.close();openCombinedBuilder(rides)};
-    d.showModal();
-  }
-  // Group names and payers are saved locally; rider matching does not change individual bookings.
-  var billingStore='hht-billing-groups-v1';
-  function loadBillingGroups(){try{var a=JSON.parse(localStorage.getItem(billingStore)||'[]');return Array.isArray(a)?a:[]}catch(e){return []}}
-  function saveBillingGroups(a){localStorage.setItem(billingStore,JSON.stringify(a))}
-  function groupRides(g){var names=(g.riders||[]).map(normBilling).filter(Boolean);return readOrders().filter(function(o){return eligibleBilling(o)&&names.includes(normBilling(o.customerName))})}
-  function showBillingGroups(){
-    var dialog=document.createElement('dialog');dialog.className='invoice-builder-dialog';
-    dialog.innerHTML='<div class="invoice-builder-form"><div class="invoice-builder-header"><div><p class="eyebrow">Hustle Hall Transport</p><h2>Billing Groups</h2><p>Create payer groups and review itemized invoices.</p></div><button type="button" class="invoice-dialog-close">×</button></div><div data-groups-list></div><form data-groups-form class="invoice-builder-grid">'+
-      '<label class="invoice-wide">Group name<input required name="name" placeholder="The Kingdom Academy"></label><label class="invoice-wide">Responsible payer<input required name="payer" placeholder="School, family or organization"></label>'+
-      '<label class="invoice-wide">Rider full names (one per line)<textarea name="riders" rows="4" placeholder="John Smith"></textarea></label>'+
-      '<label>Billing frequency<select name="frequency"><option value="on demand">On demand</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></label>'+
-      '<div class="invoice-wide invoice-builder-actions"><button class="button button-primary" type="submit">Save group</button></div></form><p class="admin-invoice-help">Groups are currently saved in this browser only. Weekly and monthly are organizational labels; invoices are generated only when you approve them.</p></div>';
-    document.body.append(dialog);
-    var form=dialog.querySelector('[data-groups-form]'),editId=null;
-    function render(){var groups=loadBillingGroups();dialog.querySelector('[data-groups-list]').innerHTML=groups.length?groups.map(function(g){var rides=groupRides(g),total=rides.reduce(function(sum,o){return sum+Number(o.total||0)},0);return '<article class="invoice-builder-summary"><strong>'+esc(g.name)+'</strong><p>Bill to: '+esc(g.payer)+' · '+esc(g.frequency)+'</p><p>'+esc(g.riders.join(', '))+'</p><p>'+rides.length+' uninvoiced rides · 
-    var b=document.querySelector('[data-combined-invoice]');if(!b)return;
-    var n=selected.size;b.disabled=n<2;b.textContent=n<2?'Combine rides into invoice':'Create combined invoice ('+n+')';
-  }
-  function decorate(){
-    var orders=readOrders();
-    Array.from(selected).forEach(function(id){var o=orders.find(function(x){return x.id===id});if(!o||invoiceLocked(o))selected.delete(id)});
-    body.querySelectorAll('tr').forEach(function(row){
-      var link=row.querySelector('a[href^="receipt.html?id="]'),cell=row.lastElementChild;if(!link||!cell)return;
-      var u=new URL(link.href,location.href),id=u.searchParams.get('id'),order=orders.find(function(x){return x.id===id});if(!order||order.service!=='ride')return;
-      if(!cell.querySelector('[data-create-invoice]')){
-        var b=document.createElement('button');b.type='button';b.className='admin-invoice-action';b.dataset.createInvoice=order.id;b.textContent=invoiceLocked(order)?'View invoice':'Create invoice';cell.insertBefore(b,cell.querySelector('.order-request-time')||null)
-      }
-      if(!cell.querySelector('[data-invoice-select]')){
-        var label=document.createElement('label');label.className='admin-invoice-select';
-        if(invoiceLocked(order)){label.innerHTML='<input type="checkbox" disabled> Invoiced';}
-        else{label.innerHTML='<input type="checkbox" data-invoice-select="'+esc(order.id)+'" '+(selected.has(order.id)?'checked':'')+'> Select for combined invoice';}
-        cell.insertBefore(label,cell.firstChild);
-      }
-    });updateCombinedButton()
-  }
-  body.addEventListener('change',function(e){var box=e.target.closest('[data-invoice-select]');if(!box)return;if(box.checked)selected.add(box.dataset.invoiceSelect);else selected.delete(box.dataset.invoiceSelect);updateCombinedButton()});
-  body.addEventListener('click',function(e){var b=e.target.closest('[data-create-invoice]');if(!b)return;var order=readOrders().find(function(x){return x.id===b.dataset.createInvoice});if(!order)return;if(invoiceLocked(order)){var target=invoiceUrl(order);if(target)window.open(target,'_blank','noopener');return}openBuilder(order)});
-  new MutationObserver(decorate).observe(body,{childList:true,subtree:true});decorate();
-  var controls=document.querySelector('.admin-filter-actions');
-  if(controls&&!controls.querySelector('[data-combined-invoice]')){
-    var combine=document.createElement('button');combine.type='button';combine.className='button button-primary combined-invoice-action';combine.dataset.combinedInvoice='';combine.disabled=true;combine.textContent='Combine rides into invoice';
-    combine.addEventListener('click',function(){var orders=readOrders().filter(function(o){return selected.has(o.id)&&o.service==='ride'&&!invoiceLocked(o)});if(orders.length>=2)openCombinedBuilder(orders)});
-    controls.append(combine);
-    var h=document.createElement('span');h.className='admin-invoice-help';h.dataset.newInvoiceHelp='';h.textContent='Select two or more uninvoiced rides, then create one itemized invoice for the payer.';controls.append(h)
-  }
-  updateCombinedButton();
-})();
-</script></body></html>
-
-+total.toFixed(2)+'</p><div class="invoice-builder-actions"><button type="button" class="button button-secondary" data-edit-group="'+esc(g.id)+'">Edit</button><button type="button" class="button button-primary" data-invoice-group="'+esc(g.id)+'" '+(!rides.length?'disabled':'')+'>Review invoice</button></div></article>'}).join(''):'<p>No groups created yet.</p>'}
-    form.addEventListener('submit',function(e){e.preventDefault();var values=Object.fromEntries(new FormData(form)),groups=loadBillingGroups(),g=groups.find(function(x){return x.id===editId});if(!g){g={id:'BG-'+Date.now()+'-'+Math.random().toString(36).slice(2,6)};groups.push(g)}g.name=values.name.trim();g.payer=values.payer.trim();g.riders=Array.from(new Set(values.riders.split(/\r?\n/).map(function(x){return x.trim()}).filter(Boolean)));g.frequency=values.frequency;saveBillingGroups(groups);editId=null;form.reset();render()});
-    dialog.addEventListener('click',function(e){var edit=e.target.closest('[data-edit-group]'),invoice=e.target.closest('[data-invoice-group]');if(edit){var g=loadBillingGroups().find(function(x){return x.id===edit.dataset.editGroup});if(!g)return;editId=g.id;form.elements.name.value=g.name;form.elements.payer.value=g.payer;form.elements.riders.value=g.riders.join('\n');form.elements.frequency.value=g.frequency;form.scrollIntoView({block:'nearest'})}if(invoice){var g=loadBillingGroups().find(function(x){return x.id===invoice.dataset.invoiceGroup});if(!g)return;var rides=groupRides(g);if(!rides.length)return;dialog.close();openCombinedBuilder(rides,g.payer)}});
-    dialog.querySelector('.invoice-dialog-close').onclick=function(){dialog.close()};dialog.addEventListener('close',function(){dialog.remove()});render();dialog.showModal();
+  function billNorm(v){return String(v||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,' ')}
+  function billEligible(o){return o&&o.service==='ride'&&!invoiceLocked(o)&&String(o.paymentStatus||'').toLowerCase()!=='paid'}
+  function billGroups(){try{return JSON.parse(localStorage.getItem('hhtGroups')||'[]')}catch(e){return []}}
+  function billSave(g){localStorage.setItem('hhtGroups',JSON.stringify(g))}
+  function billRides(group){var names=group.riders.map(billNorm);return readOrders().filter(function(o){return billEligible(o)&&names.includes(billNorm(o.customerName))})}
+  function billModal(){
+    var d=document.createElement('dialog');d.className='invoice-builder-dialog';
+    d.innerHTML='<div class="invoice-builder-form"><div class="invoice-builder-header"><div><h2>Billing Groups</h2><p>Group riders under one responsible payer.</p></div><button type="button" data-close>×</button></div><div data-groups></div><form data-add-group class="invoice-builder-grid"><label class="invoice-wide">Group name<input name="name" required></label><label class="invoice-wide">Responsible payer<input name="payer" required></label><label class="invoice-wide">Rider full names, one per line<textarea name="riders" rows="4"></textarea></label><label>Billing cycle<select name="cycle"><option>On demand</option><option>Weekly</option><option>Monthly</option></select></label><button type="submit" class="button button-primary">Save group</button></form><p class="admin-invoice-help">Groups are saved in this browser. Invoices are created only after your approval.</p></div>';
+    document.body.append(d);var form=d.querySelector('form'),editId='';
+    function render(){d.querySelector('[data-groups]').innerHTML=billGroups().map(function(g){var rides=billRides(g);return '<article class="invoice-builder-summary"><strong>'+esc(g.name)+'</strong><p>Bill to: '+esc(g.payer)+' · '+esc(g.cycle)+'</p><p>'+esc(g.riders.join(', '))+'</p><p>'+rides.length+' uninvoiced rides</p><button type="button" class="button button-secondary" data-edit="'+esc(g.id)+'">Edit</button> <button type="button" class="button button-primary" data-group-invoice="'+esc(g.id)+'" '+(!rides.length?'disabled':'')+'>Review invoice</button></article>'}).join('')||'<p>No groups yet.</p>'}
+    form.addEventListener('submit',function(e){e.preventDefault();var values=Object.fromEntries(new FormData(form)),groups=billGroups(),g=groups.find(function(x){return x.id===editId});if(!g){g={id:'BG'+Date.now()};groups.push(g)}g.name=values.name.trim();g.payer=values.payer.trim();g.cycle=values.cycle;g.riders=values.riders.split(/\r?\n/).map(function(x){return x.trim()}).filter(Boolean);billSave(groups);editId='';form.reset();render()});
+    d.addEventListener('click',function(e){var edit=e.target.closest('[data-edit]'),invoice=e.target.closest('[data-group-invoice]');if(edit){var g=billGroups().find(function(x){return x.id===edit.dataset.edit});if(!g)return;editId=g.id;form.elements.name.value=g.name;form.elements.payer.value=g.payer;form.elements.riders.value=g.riders.join('\n');form.elements.cycle.value=g.cycle;form.scrollIntoView()}if(invoice){var g=billGroups().find(function(x){return x.id===invoice.dataset.groupInvoice});if(!g)return;var rides=billRides(g);if(!rides.length)return;d.close();openCombinedBuilder(rides,g.payer)}});
+    d.querySelector('[data-close]').onclick=function(){d.close()};d.addEventListener('close',function(){d.remove()});render();d.showModal();
   }
   function updateCombinedButton(){
     var b=document.querySelector('[data-combined-invoice]');if(!b)return;
