@@ -1491,6 +1491,80 @@ function hhtRenderCombinedInvoice() {
 }
 hhtRenderCombinedInvoice();
 
+async function hhtCreateCombinedInvoicePaymentLink(order) {
+  const response = await fetch('/api/create-checkout-session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ order: { ...order, paymentType: 'combined_invoice' } })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.url) throw new Error(data.error || 'Stripe payment link could not be created.');
+  return data.url;
+}
+
+function hhtEnsureQrCode() {
+  if (window.QRCode) return Promise.resolve();
+  if (window.hhtQrCodeLoading) return window.hhtQrCodeLoading;
+  window.hhtQrCodeLoading = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
+    script.onload = resolve;
+    script.onerror = () => reject(new Error('The QR code tool could not be loaded.'));
+    document.head.append(script);
+  });
+  return window.hhtQrCodeLoading;
+}
+
+async function hhtShowCombinedInvoicePaymentLink(panel, url) {
+  const link = panel.querySelector('[data-combined-payment-link]');
+  const qr = panel.querySelector('[data-combined-payment-qr]');
+  link.href = url;
+  link.hidden = false;
+  qr.hidden = false;
+  qr.replaceChildren();
+  await hhtEnsureQrCode();
+  new window.QRCode(qr, {
+    text: url,
+    width: 220,
+    height: 220,
+    colorDark: '#171017',
+    colorLight: '#ffffff',
+    correctLevel: window.QRCode.CorrectLevel.M
+  });
+}
+
+function hhtAttachCombinedInvoicePayments() {
+  const target = document.querySelector('[data-receipt]');
+  const orderId = new URLSearchParams(location.search).get('id');
+  const order = readOrders().find((item) => item.id === orderId);
+  if (!target || !order?.combinedInvoice || target.querySelector('[data-combined-payment-panel]')) return;
+
+  const panel = document.createElement('section');
+  panel.className = 'combined-invoice-payment';
+  panel.dataset.combinedPaymentPanel = 'true';
+  panel.innerHTML = '<hr><h2>Pay this invoice</h2><p>Pay securely through Stripe by card or an eligible US bank account (ACH). Stripe deposits completed payments to All Moving Parts LLC\'s connected Space Coast Credit Union payout account.</p><p><strong>Do not send bank-account details by text or email.</strong> Use the secure Stripe checkout instead.</p><div class="receipt-actions"><button type="button" class="button button-primary" data-pay-combined>Pay securely with Stripe</button><button type="button" class="button button-secondary" data-create-combined-link>Create payment link &amp; QR code</button></div><a class="button button-secondary" data-combined-payment-link hidden target="_blank" rel="noopener">Open secure payment link</a><div data-combined-payment-qr hidden><p><strong>Scan to pay securely</strong></p></div><p class="status-note-error" data-combined-payment-error aria-live="polite"></p>';
+  target.append(panel);
+
+  const error = panel.querySelector('[data-combined-payment-error]');
+  const createLink = async (redirectToCheckout) => {
+    error.textContent = '';
+    const controls = panel.querySelectorAll('button');
+    controls.forEach((button) => { button.disabled = true; });
+    try {
+      const url = await hhtCreateCombinedInvoicePaymentLink(order);
+      await hhtShowCombinedInvoicePaymentLink(panel, url);
+      if (redirectToCheckout) window.location.assign(url);
+    } catch (paymentError) {
+      error.textContent = paymentError.message || 'The secure payment link could not be created.';
+    } finally {
+      controls.forEach((button) => { button.disabled = false; });
+    }
+  };
+  panel.querySelector('[data-pay-combined]').addEventListener('click', () => createLink(true));
+  panel.querySelector('[data-create-combined-link]').addEventListener('click', () => createLink(false));
+}
+hhtAttachCombinedInvoicePayments();
+
 function hhtCombineInvoices(primaryId) {
   const orders = readOrders();
   const primary = orders.find((item) => item.id === primaryId);
