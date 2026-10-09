@@ -392,7 +392,7 @@ document.querySelectorAll('[data-booking-form]').forEach((form) => {
 function orderDetails(order) { return `<div class="detail-list"><div><span>Service</span><strong>${order.service}</strong></div><div><span>Status</span><strong><i class="status-pill">${order.status}</i></strong></div><div><span>Pickup</span><strong>${order.pickup}</strong></div><div><span>Delivery</span><strong>${order.delivery}</strong></div><div><span>Customer</span><strong>${order.customerName}</strong></div><div><span>Phone</span><strong>${order.phone}</strong></div><div><span>Promo</span><strong>${order.promoCode ? (order.promoPending ? `${order.promoCode} (apply to final quote)` : `${order.promoCode} (-${money(order.promoDiscount)})`) : 'None'}</strong></div></div>`; }
 
 const trackingForm = document.querySelector('[data-tracking-form]');
-if (trackingForm) trackingForm.addEventListener('submit', (event) => { event.preventDefault(); const q = new FormData(trackingForm).get('lookup').trim().toLowerCase(); const matches = readOrders().filter(o => o.id.toLowerCase() === q || o.phone.replace(/\D/g, '') === q.replace(/\D/g, '')); const result = document.querySelector('[data-tracking-result]'); result.innerHTML = matches.length ? matches.map(o => `<article class="result-card"><h2>${o.id}</h2>${orderDetails(o)}<a class="button button-secondary" href="receipt.html?id=${encodeURIComponent(o.id)}">View receipt</a></article>`).join('') : '<p>No order was found. Check the receipt number or phone number and try again.</p>'; });
+if (trackingForm) trackingForm.addEventListener('submit', (event) => { event.preventDefault(); const q = new FormData(trackingForm).get('lookup').trim().toLowerCase(); const matches = readOrders().filter(o => o.id.toLowerCase() === q || o.phone.replace(/\D/g, '') === q.replace(/\D/g, '')); const result = document.querySelector('[data-tracking-result]'); result.innerHTML = matches.length ? matches.map(o => `<article class="result-card"><h2>${o.id}</h2>${orderDetails(o)}<a class="button button-small button-secondary" href="receipt.html?id=${encodeURIComponent(o.id)}">View receipt</a></article>`).join('') : '<p>No order was found. Check the receipt number or phone number and try again.</p>'; });
 
 const receipt = document.querySelector('[data-receipt]');
 if (receipt) { const id = new URLSearchParams(location.search).get('id'); const order = readOrders().find(o => o.id === id); receipt.innerHTML = order ? `<p class="eyebrow">Hustle Hall Transport</p><h1>Digital receipt</h1><p class="receipt-id">${order.id}</p><p>Created ${order.createdAt}</p><hr>${orderDetails(order)}<hr>${order.service === 'package' ? `<div class="receipt-row"><span>${order.size} package</span><strong>${money(order.base)}</strong></div><div class="receipt-row"><span>Distance surcharge</span><strong>${money(order.surcharge)}</strong></div><div class="receipt-row"><span>Distance</span><strong>${order.miles} miles</strong></div><div class="receipt-row receipt-total"><span>Total</span><strong>${money(order.total)}</strong></div>` : order.quotePending ? `<div class="receipt-row"><span>Booking type</span><strong>Multi-day ride request</strong></div><div class="receipt-row"><span>Service dates</span><strong>${order.startDate || 'To be confirmed'} to ${order.endDate || 'To be confirmed'}</strong></div><div class="receipt-row"><span>Rides per day</span><strong>${order.ridesPerDay || 1}</strong></div><div class="receipt-row"><span>Estimated rides</span><strong>${order.estimatedRideCount || 'To be confirmed'}</strong></div><div class="receipt-row"><span>Per-ride estimate</span><strong>${order.perRideEstimate ? money(order.perRideEstimate) : 'To be confirmed'}</strong></div>${order.promoCode ? `<div class="receipt-row"><span>Promo discount</span><strong>-${money(order.promoDiscount)}</strong></div>` : ''}<div class="receipt-row receipt-total"><span>Pre-approval estimate</span><strong>${order.total ? money(order.total) : 'To be confirmed'}</strong></div><p>This estimate is not a final charge. Availability, route changes, added stops, tolls, and schedule changes may affect the approved price.</p>` : `<div class="receipt-row"><span>Base fare</span><strong>${money(order.base)}</strong></div><div class="receipt-row"><span>Mileage (${order.miles} miles)</span><strong>${money(order.mileCharge)}</strong></div><div class="receipt-row"><span>Time (${order.minutes} minutes)</span><strong>${money(order.minuteCharge)}</strong></div><div class="receipt-row receipt-total"><span>Total</span><strong>${money(order.total)}</strong></div>`}<hr><p><strong>Hustle Hard. Deliver Smart.</strong><br>239-800-1380<br>Powered by ALLMOVINGPARTS LLC</p>` : '<h1>Receipt not found</h1><p>This receipt is not available in this browser.</p>'; }
@@ -437,7 +437,7 @@ function renderAdmin() {
   const delivered = orders.filter((order) => ['Delivered', 'Completed'].includes(order.status));
   const visibleOrders = getAdminFilteredOrders(orders);
   document.querySelector('[data-admin-stats]').innerHTML = `<article class="stat-card"><span>Total requests</span><strong>${orders.length}</strong></article><article class="stat-card"><span>Active requests</span><strong>${orders.filter((order) => !['Delivered', 'Completed', 'Rejected', 'Cancelled'].includes(order.status)).length}</strong></article><article class="stat-card"><span>Delivered revenue</span><strong>${money(delivered.reduce((sum, order) => sum + Number(order.total || 0), 0))}</strong></article>`;
-  body.innerHTML = visibleOrders.length ? visibleOrders.map((order) => `<tr><td><a class="admin-order-link" data-order-details="${escapePortalText(order.id)}" href="receipt.html?id=${encodeURIComponent(order.id)}" aria-label="View details for order ${escapePortalText(order.id)}">${escapePortalText(order.id)}</a></td><td>${escapePortalText(order.customerName)}<br><small>${escapePortalText(order.phone)}</small></td><td>${escapePortalText(order.service)}</td><td>${order.preApprovalEstimate ? `Est. ${money(order.total)}` : (order.total ? money(order.total) : 'TBD')}</td><td><select data-status="${escapePortalText(order.id)}">${statuses.map((status) => `<option ${status === order.status ? 'selected' : ''}>${status}</option>`).join('')}</select></td><td><button type="button" class="button button-primary" data-combine-row="${escapePortalText(order.id)}">Combine invoices</button><a class="button button-secondary" href="receipt.html?id=${encodeURIComponent(order.id)}">View invoice</a><small class="order-request-time">Received: ${escapePortalText(order.createdAt || 'Not available')}</small><small class="order-completed-time">Completed: ${escapePortalText(order.completedAt || 'Not completed')}</small></td></tr>`).join('') : '<tr><td colspan="6">No requests match this filter.</td></tr>';
+  body.innerHTML = visibleOrders.length ? visibleOrders.map((order) => `<tr><td><a class="admin-order-link" data-order-details="${escapePortalText(order.id)}" href="receipt.html?id=${encodeURIComponent(order.id)}" aria-label="View details for order ${escapePortalText(order.id)}">${escapePortalText(order.id)}</a></td><td>${escapePortalText(order.customerName)}<br><small>${escapePortalText(order.phone)}</small></td><td>${escapePortalText(order.service)}</td><td>${order.preApprovalEstimate ? `Est. ${money(order.total)}` : (order.total ? money(order.total) : 'TBD')}</td><td><select data-status="${escapePortalText(order.id)}">${statuses.map((status) => `<option ${status === order.status ? 'selected' : ''}>${status}</option>`).join('')}</select></td><td><button type="button" class="button button-small button-primary" data-combine-row="${escapePortalText(order.id)}">Combine invoices</button><a class="button button-secondary" href="receipt.html?id=${encodeURIComponent(order.id)}">View invoice</a><small class="order-request-time">Received: ${escapePortalText(order.createdAt || 'Not available')}</small><small class="order-completed-time">Completed: ${escapePortalText(order.completedAt || 'Not completed')}</small></td></tr>`).join('') : '<tr><td colspan="6">No requests match this filter.</td></tr>';
   body.querySelectorAll('[data-order-details]').forEach((link) => link.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -1399,6 +1399,71 @@ function hhtInvoiceCustomerKey(order) {
   return email ? `email:${email}` : '';
 }
 
+function hhtInvoiceText(value) {
+  return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function hhtInvoiceCustomerKey(order) {
+  const phone = String(order.phone || '').replace(/\D/g, '');
+  if (phone) return `phone:` + phone;
+  const email = String(order.email || '').trim().toLowerCase();
+  return email ? `email:` + email : '';
+}
+
+function hhtInvoiceLastName(order) {
+  const words = hhtInvoiceText(order.customerName).split(' ').filter(Boolean);
+  return words.length > 1 ? words.at(-1) : '';
+}
+
+function hhtInvoicePostedDate(order) {
+  const value = order.createdAt || order.created_at || '';
+  const date = new Date(value);
+  if (!Number.isNaN(date.getTime())) return date.toISOString().slice(0, 10);
+  return hhtInvoiceText(value).split(',')[0];
+}
+
+function hhtInvoiceServiceDays(order) {
+  const dates = order.selectedDates || order.serviceDates || order.dates || [];
+  if (Array.isArray(dates) && dates.length) return dates.join(', ');
+  if (typeof dates === 'string' && dates.trim()) return dates;
+  return [order.date, order.time].filter(Boolean).join(' at ') || 'Not scheduled';
+}
+
+function hhtInvoiceMatchReasons(primary, candidate) {
+  const reasons = [];
+  const primaryCustomer = hhtInvoiceCustomerKey(primary);
+  const candidateCustomer = hhtInvoiceCustomerKey(candidate);
+  if (primaryCustomer && primaryCustomer === candidateCustomer) reasons.push('same customer contact');
+
+  const primaryLastName = hhtInvoiceLastName(primary);
+  if (primaryLastName && primaryLastName === hhtInvoiceLastName(candidate)) reasons.push('same last name');
+
+  const primaryDestination = hhtInvoiceText(primary.delivery);
+  if (primaryDestination && primaryDestination === hhtInvoiceText(candidate.delivery)) reasons.push('same drop-off');
+
+  const primaryPromo = hhtInvoiceText(primary.promoCode);
+  if (primaryPromo && primaryPromo === hhtInvoiceText(candidate.promoCode)) reasons.push('same promo code');
+
+  const primaryPostedDate = hhtInvoicePostedDate(primary);
+  if (primaryPostedDate && primaryPostedDate === hhtInvoicePostedDate(candidate)) reasons.push('same posted date');
+  return reasons;
+}
+
+function hhtInvoiceItem(order) {
+  return {
+    id: order.id,
+    service: order.service === 'package' ? 'Package delivery' : 'Ride',
+    customerName: order.customerName || 'Customer',
+    pickup: order.pickup || 'Not provided',
+    delivery: order.delivery || 'Not provided',
+    postedAt: order.createdAt || '',
+    serviceDays: hhtInvoiceServiceDays(order),
+    promoCode: order.promoCode || '',
+    promoDiscount: Number(order.promoDiscount || 0),
+    total: Number(order.total || 0)
+  };
+}
+
 function hhtRenderCombinedInvoice() {
   const target = document.querySelector('[data-receipt]');
   const orderId = new URLSearchParams(location.search).get('id');
@@ -1409,17 +1474,19 @@ function hhtRenderCombinedInvoice() {
   const items = Array.isArray(invoice.items) ? invoice.items : [];
   target.innerHTML = `<p class="eyebrow">Hustle Hall Transport</p>
     <h1>Combined invoice</h1>
-    <p class="receipt-id">${escapePortalText(invoice.id || order.id)}</p>
-    <p>Created ${escapePortalText(invoice.createdAt || order.createdAt || '')}</p>
+    <p class="receipt-id">` + escapePortalText(invoice.id || order.id) + `</p>
+    <p>Created ` + escapePortalText(invoice.createdAt || order.createdAt || '') + `</p>
     <hr>
     <div class="detail-list">
-      <div><span>Customer</span><strong>${escapePortalText(order.customerName || 'Customer')}</strong></div>
-      <div><span>Payment status</span><strong>${escapePortalText(invoice.paymentStatus || order.paymentStatus || 'Awaiting payment')}</strong></div>
+      <div><span>Lead invoice</span><strong>` + escapePortalText(order.id) + `</strong></div>
+      <div><span>Payment status</span><strong>` + escapePortalText(invoice.paymentStatus || order.paymentStatus || 'Awaiting payment') + `</strong></div>
+      <div><span>Included services</span><strong>` + items.length + `</strong></div>
     </div>
     <hr>
-    ${items.map((item) => `<div class="receipt-row"><span>${escapePortalText(item.id)} · ${escapePortalText(item.service || 'Service')}</span><strong>${money(item.total)}</strong></div>`).join('')}
-    <div class="receipt-row receipt-total"><span>Combined total</span><strong>${money(invoice.total)}</strong></div>
-    ${invoice.note ? `<p><strong>Invoice note:</strong> ${escapePortalText(invoice.note)}</p>` : ''}
+    <h2>Service report</h2>
+    ` + items.map((item) => `<section class="combined-invoice-item"><div class="receipt-row"><span><strong>` + escapePortalText(item.id) + `</strong> · ` + escapePortalText(item.service || 'Service') + `</span><strong>` + money(item.total) + `</strong></div><div class="detail-list"><div><span>Customer</span><strong>` + escapePortalText(item.customerName || 'Customer') + `</strong></div><div><span>Posted</span><strong>` + escapePortalText(item.postedAt || 'Not available') + `</strong></div><div><span>Service day / time</span><strong>` + escapePortalText(item.serviceDays || 'Not scheduled') + `</strong></div><div><span>Promo</span><strong>` + escapePortalText(item.promoCode || 'None') + (item.promoDiscount ? ` (-` + money(item.promoDiscount) + `)` : '') + `</strong></div><div><span>Pickup</span><strong>` + escapePortalText(item.pickup || 'Not provided') + `</strong></div><div><span>Drop-off</span><strong>` + escapePortalText(item.delivery || 'Not provided') + `</strong></div></div></section>`).join('') + `
+    <div class="receipt-row receipt-total"><span>Combined total</span><strong>` + money(invoice.total) + `</strong></div>
+    ` + (invoice.note ? `<p><strong>Invoice note:</strong> ` + escapePortalText(invoice.note) + `</p>` : '') + `
     <hr><p><strong>Hustle Hard. Deliver Smart.</strong><br>239-800-1380<br>Powered by ALLMOVINGPARTS LLC</p>`;
 }
 hhtRenderCombinedInvoice();
@@ -1428,13 +1495,15 @@ function hhtCombineInvoices(primaryId) {
   const orders = readOrders();
   const primary = orders.find((item) => item.id === primaryId);
   if (!primary) return;
-  const customerKey = hhtInvoiceCustomerKey(primary);
+  const existingSourceIds = new Set(primary.combinedInvoice?.sourceOrderIds || []);
   const candidates = orders.filter((item) => {
-    if (!customerKey || hhtInvoiceCustomerKey(item) !== customerKey) return false;
-    return !['Cancelled', 'Rejected'].includes(item.status);
+    if (item.id === primary.id) return true;
+    if (['Cancelled', 'Rejected'].includes(item.status)) return false;
+    if (item.combinedInto && !existingSourceIds.has(item.id)) return false;
+    return hhtInvoiceMatchReasons(primary, item).length > 0;
   });
   if (candidates.length < 2) {
-    window.alert('This customer needs at least two saved invoices before they can be combined.');
+    window.alert('No related invoices were found. Matches can use the same contact, last name, drop-off destination, promo code, or posted date.');
     return;
   }
 
@@ -1442,15 +1511,15 @@ function hhtCombineInvoices(primaryId) {
   dialog.className = 'order-details-dialog invoice-combine-dialog';
   dialog.innerHTML = `<form method="dialog">
     <div class="order-details-header">
-      <div><p class="eyebrow">Combined invoice</p><h2>${escapePortalText(primary.customerName || primary.id)}</h2></div>
+      <div><p class="eyebrow">Combined invoice</p><h2>` + escapePortalText(primary.customerName || primary.id) + `</h2></div>
       <button type="button" class="order-details-close" aria-label="Close">&times;</button>
     </div>
-    <p>Select two or more invoices for this customer. The source orders stay saved separately for your records.</p>
+    <p>Select two or more related invoices. Matches are based on a shared contact, last name, drop-off destination, promo code, or posted date. Every selected service stays detailed in the invoice report.</p>
     <div class="form-grid">
-      <label class="form-wide">Invoice note (optional)<textarea name="combinedNote" rows="3">${escapePortalText(primary.combinedInvoice?.note || '')}</textarea></label>
+      <label class="form-wide">Invoice note (optional)<textarea name="combinedNote" rows="3">` + escapePortalText(primary.combinedInvoice?.note || '') + `</textarea></label>
     </div>
     <div class="combined-invoice-options">
-      ${candidates.map((item) => `<label><input type="checkbox" value="${escapePortalText(item.id)}" ${item.id === primary.id ? 'checked disabled' : (primary.combinedInvoice?.sourceOrderIds?.includes(item.id) ? 'checked' : '')}> <strong>${escapePortalText(item.id)}</strong> · ${escapePortalText(item.service === 'package' ? 'Package delivery' : 'Ride')} · ${money(item.total)}</label>`).join('')}
+      ` + candidates.map((item) => { const reasons = item.id === primary.id ? ['selected order'] : hhtInvoiceMatchReasons(primary, item); return `<label><input type="checkbox" value="` + escapePortalText(item.id) + `" ` + (item.id === primary.id ? 'checked disabled' : (existingSourceIds.has(item.id) ? 'checked' : '')) + `> <strong>` + escapePortalText(item.id) + `</strong> · ` + escapePortalText(item.customerName || 'Customer') + ` · ` + escapePortalText(item.service === 'package' ? 'Package delivery' : 'Ride') + ` · ` + money(item.total) + `<br><small>Matched by: ` + escapePortalText(reasons.join(', ')) + ` · ` + escapePortalText(hhtInvoiceServiceDays(item)) + `</small></label>`; }).join('') + `
     </div>
     <p class="invoice-calculation">Combined total: <strong data-combined-total></strong></p>
     <p class="status-note-error" aria-live="polite"></p>
@@ -1485,13 +1554,8 @@ function hhtCombineInvoices(primaryId) {
     }
 
     const createdAt = new Date().toLocaleString();
-    const combinedId = primary.combinedInvoice?.id || `HHT-COM-${Date.now()}`;
-    const items = selected.map((item) => ({
-      id: item.id,
-      service: item.service === 'package' ? 'Package delivery' : 'Ride',
-      createdAt: item.createdAt,
-      total: Number(item.total || 0)
-    }));
+    const combinedId = primary.combinedInvoice?.id || `HHT-COM-` + Date.now();
+    const items = selected.map(hhtInvoiceItem);
     const combinedInvoice = {
       id: combinedId,
       createdAt,
@@ -1501,13 +1565,16 @@ function hhtCombineInvoices(primaryId) {
       paymentStatus: primary.paymentStatus || 'Awaiting payment',
       note: form.elements.combinedNote.value.trim()
     };
-    const updates = selected.map((item) => item.id === primary.id
-      ? { ...item, combinedInvoice, invoiceEditedAt: createdAt }
-      : { ...item, combinedInto: { id: combinedId, primaryOrderId: primary.id, createdAt } });
+    const relatedIds = new Set([...existingSourceIds, ...selected.map((item) => item.id)]);
+    const updates = orders.filter((item) => relatedIds.has(item.id)).map((item) => {
+      if (item.id === primary.id) return { ...item, combinedInvoice, invoiceEditedAt: createdAt };
+      if (selected.some((selectedItem) => selectedItem.id === item.id)) return { ...item, combinedInto: { id: combinedId, primaryOrderId: primary.id, createdAt } };
+      return { ...item, combinedInto: null };
+    });
 
     const save = form.querySelector('[type="submit"]');
     save.disabled = true;
-    save.textContent = 'Saving…';
+    save.textContent = 'Saving`';
     try {
       const client = await hhtSupabaseReady;
       const results = await Promise.all(updates.map((item) => client.from('orders')
@@ -1520,7 +1587,7 @@ function hhtCombineInvoices(primaryId) {
       saveOrders(list);
       renderAdmin();
       close();
-      window.location.href = `receipt.html?id=${encodeURIComponent(primary.id)}`;
+      window.location.href = `receipt.html?id=` + encodeURIComponent(primary.id);
     } catch (saveError) {
       error.textContent = 'The combined invoice could not be saved. Check your connection and admin access.';
       save.disabled = false;
