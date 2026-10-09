@@ -39,7 +39,18 @@ function calculatePromoDiscount(order, subtotal) {
   return Math.min(subtotal, promo.maxDiscount || rawDiscount, rawDiscount);
 }
 
+function calculateCombinedInvoiceTotal(order) {
+  const items = Array.isArray(order.combinedInvoice?.items) ? order.combinedInvoice.items : [];
+  if (!items.length) throw new Error('A combined invoice must include at least one service.');
+  const total = items.reduce((sum, item) => sum + Math.max(0, Number(item.total) || 0), 0);
+  if (!Number.isFinite(total) || total < 0.5) throw new Error('A valid combined invoice amount is required.');
+  return total;
+}
+
 function calculateTotal(order) {
+  if (Array.isArray(order.combinedInvoice?.items) && order.combinedInvoice.items.length) {
+    return calculateCombinedInvoiceTotal(order);
+  }
   const miles = Math.max(0, Number(order.miles) || 0);
 
   if (order.service === 'package') {
@@ -75,7 +86,8 @@ module.exports = async function handler(req, res) {
 
   try {
     const { order } = req.body || {};
-    if (!order || !order.id || !['ride', 'package'].includes(order.service)) {
+    const isCombinedInvoice = Boolean(order?.combinedInvoice && Array.isArray(order.combinedInvoice.items) && order.combinedInvoice.items.length);
+    if (!order || !order.id || (!['ride', 'package'].includes(order.service) && !isCombinedInvoice)) {
       return res.status(400).json({ error: 'A valid booking is required.' });
     }
 
@@ -85,10 +97,13 @@ module.exports = async function handler(req, res) {
     }
 
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-    const serviceName = order.service === 'package' ? 'Package Delivery' : 'Ride';
-    const page = order.service === 'package' ? 'package-booking' : 'ride-booking';
+    const serviceName = isCombinedInvoice
+      ? 'Combined Invoice ' + (order.combinedInvoice.id || order.id)
+      : (order.service === 'package' ? 'Package Delivery' : 'Ride');
+    const receiptUrl = 'https://hustlehall.allmovingparts.com/receipt.html?id=' + encodeURIComponent(order.id);
 
     const session = await stripe.checkout.sessions.create({
+      integration_identifier: 'hht_combined_invoice_' + Math.random().toString(36).slice(2, 10),
       mode: 'payment',
       customer_email: order.email || undefined,
       client_reference_id: order.id,
@@ -104,12 +119,14 @@ module.exports = async function handler(req, res) {
         bookingId: order.id,
         customerName: order.customerName || '',
         serviceType: order.service,
+        paymentType: isCombinedInvoice ? 'combined_invoice' : 'booking',
+        combinedInvoiceId: isCombinedInvoice ? (order.combinedInvoice.id || '') : '',
         promoCode: isTuesdayFiveEligible(order) ? 'TUESDAY5' : (order.promoCode || ''),
-        bookingTotal: Number(order.total || 0).toFixed(2),
+        bookingTotal: (isCombinedInvoice ? amount : Number(order.total || 0)).toFixed(2),
         chargedTotal: amount.toFixed(2)
       },
-      success_url: `https://hustlehall.allmovingparts.com/receipt.html?id=${encodeURIComponent(order.id)}&payment=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `https://hustlehall.allmovingparts.com/${page}.html?payment=cancelled`
+      success_url: receiptUrl + '&payment=success&session_id={CHECKOUT_SESSION_ID}',
+      cancel_url: receiptUrl + '&payment=cancelled'
     });
 
     return res.status(200).json({ url: session.url, sessionId: session.id });
