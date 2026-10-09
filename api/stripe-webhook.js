@@ -35,9 +35,15 @@ async function updatePaymentStatus(session, paymentStatus) {
   if (!host) return;
   const hostPayload = host.payload || {};
   const invoice = hostPayload.invoice || {};
-  const relatedIds = session.metadata?.paymentType === 'invoice' && Array.isArray(invoice.relatedOrderIds) && invoice.relatedOrderIds.length
-    ? invoice.relatedOrderIds.map(String)
-    : [session.metadata.bookingId];
+  const combinedInvoice = hostPayload.combinedInvoice || {};
+  const isCombinedInvoice = session.metadata?.paymentType === 'combined_invoice'
+    && Array.isArray(combinedInvoice.sourceOrderIds)
+    && combinedInvoice.sourceOrderIds.length;
+  const relatedIds = isCombinedInvoice
+    ? combinedInvoice.sourceOrderIds.map(String)
+    : (session.metadata?.paymentType === 'invoice' && Array.isArray(invoice.relatedOrderIds) && invoice.relatedOrderIds.length
+      ? invoice.relatedOrderIds.map(String)
+      : [session.metadata.bookingId]);
 
   const paidAt = paymentStatus === 'Paid' ? new Date().toLocaleString() : undefined;
 
@@ -52,12 +58,30 @@ async function updatePaymentStatus(session, paymentStatus) {
       paidAt
     };
 
+    if (orderId === host.id && isCombinedInvoice && currentPayload.combinedInvoice) {
+      payload.combinedInvoice = {
+        ...currentPayload.combinedInvoice,
+        paymentStatus,
+        status: paymentStatus === 'Paid' ? 'Paid' : currentPayload.combinedInvoice.status,
+        paidAt: paidAt || currentPayload.combinedInvoice.paidAt,
+        stripeSessionId: session.id
+      };
+    }
+
     if (orderId === host.id && currentPayload.invoice && session.metadata?.paymentType === 'invoice') {
       payload.invoice = {
         ...currentPayload.invoice,
         status: paymentStatus === 'Paid' ? 'Paid' : currentPayload.invoice.status,
         paidAt: paidAt || currentPayload.invoice.paidAt,
         stripeSessionId: session.id
+      };
+    }
+
+    if (isCombinedInvoice && currentPayload.combinedInto?.id === combinedInvoice.id) {
+      payload.combinedInto = {
+        ...currentPayload.combinedInto,
+        paymentStatus,
+        paidAt: paidAt || currentPayload.combinedInto.paidAt
       };
     }
 
