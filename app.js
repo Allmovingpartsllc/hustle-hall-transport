@@ -1377,7 +1377,7 @@ hhtAttachInvoiceEditor();
 function hhtAttachInvoiceLabels() {
   document.querySelectorAll('dialog[open].order-details-dialog').forEach((dialog) => {
     const receipt = dialog.querySelector('.order-details-actions a[href^="receipt.html"]');
-    if (receipt) receipt.textContent = 'View invoice';
+    if (receipt) receipt.textContent = 'Create Invoice';
   });
 }
 
