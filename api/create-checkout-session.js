@@ -110,7 +110,7 @@ module.exports = async function handler(req, res) {
       line_items: [{
         price_data: {
           currency: 'usd',
-          product_data: { name: `Hustle Hall Transport - ${serviceName}` },
+          product_data: { name: `AllMovingParts LLC - ${serviceName}` },
           unit_amount: Math.round(amount * 100)
         },
         quantity: 1
