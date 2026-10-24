@@ -351,3 +351,47 @@ body { background: var(--paper); }
 }
 
 .booking-submit-note { margin: 1rem 0 0; color: #59606b; font-size: .94rem; line-height: 1.5; }
+
+
+.invoice-payment-panel {
+  margin-top: 26px;
+}
+
+.invoice-payment-panel h2 {
+  margin-bottom: 8px;
+}
+
+.invoice-payment-qr {
+  display: grid;
+  justify-content: center;
+  width: min(100%, 260px);
+  min-height: 232px;
+  margin: 18px auto 10px;
+  padding: 18px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.invoice-payment-qr img,
+.invoice-payment-qr canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.invoice-payment-status {
+  text-align: center;
+  color: var(--ink-soft);
+}
+
+@media (max-width: 640px) {
+  .invoice-payment-panel .receipt-actions {
+    flex-direction: column;
+  }
+
+  .invoice-payment-panel .receipt-actions .button {
+    width: 100%;
+    text-align: center;
+  }
+}
