@@ -1452,11 +1452,11 @@ function hhtRenderCombinedInvoice() {
 }
 hhtRenderCombinedInvoice();
 
-async function hhtCreateCombinedInvoicePaymentLink(order) {
+async function hhtCreateInvoicePaymentLink(order) {
   const response = await fetch('/api/create-checkout-session', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ order: { ...order, paymentType: 'combined_invoice' } })
+    body: JSON.stringify({ order })
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || !data.url) throw new Error(data.error || 'Stripe payment link could not be created.');
@@ -1476,9 +1476,10 @@ function hhtEnsureQrCode() {
   return window.hhtQrCodeLoading;
 }
 
-async function hhtShowCombinedInvoicePaymentLink(panel, url) {
-  const link = panel.querySelector('[data-combined-payment-link]');
-  const qr = panel.querySelector('[data-combined-payment-qr]');
+async function hhtShowInvoicePaymentLink(panel, url) {
+  const link = panel.querySelector('[data-invoice-payment-link]');
+  const qr = panel.querySelector('[data-invoice-payment-qr]');
+  const qrStatus = panel.querySelector('[data-invoice-qr-status]');
   link.href = url;
   link.hidden = false;
   qr.hidden = false;
@@ -1492,39 +1493,64 @@ async function hhtShowCombinedInvoicePaymentLink(panel, url) {
     colorLight: '#ffffff',
     correctLevel: window.QRCode.CorrectLevel.M
   });
+  qrStatus.textContent = 'Scan this QR code to open the same secure Stripe checkout on your phone.';
 }
 
-function hhtAttachCombinedInvoicePayments() {
+function hhtAttachInvoicePayments() {
   const target = document.querySelector('[data-receipt]');
   const orderId = new URLSearchParams(location.search).get('id');
   const order = readOrders().find((item) => item.id === orderId);
-  if (!target || !order?.combinedInvoice || target.querySelector('[data-combined-payment-panel]')) return;
+  if (!target || !order || target.querySelector('[data-invoice-payment-panel]')) return;
+
+  const combinedInvoice = order.combinedInvoice;
+  const paymentStatus = combinedInvoice?.paymentStatus || order.paymentStatus || 'Not paid';
+  const cannotPayYet = !combinedInvoice && (order.quotePending || order.status === 'Pending Approval');
+  const isPaid = paymentStatus === 'Paid';
+  const isCancelled = ['Cancelled', 'Rejected'].includes(order.status);
 
   const panel = document.createElement('section');
-  panel.className = 'combined-invoice-payment';
-  panel.dataset.combinedPaymentPanel = 'true';
-  panel.innerHTML = '<hr><h2>Pay this invoice</h2><p>Pay securely through Stripe by card or an eligible US bank account (ACH). Stripe deposits completed payments to All Moving Parts LLC\'s connected Space Coast Credit Union payout account.</p><p><strong>Do not send bank-account details by text or email.</strong> Use the secure Stripe checkout instead.</p><div class="receipt-actions"><button type="button" class="button button-primary" data-pay-combined>Pay securely with Stripe</button><button type="button" class="button button-secondary" data-create-combined-link>Create payment link &amp; QR code</button></div><a class="button button-secondary" data-combined-payment-link hidden target="_blank" rel="noopener">Open secure payment link</a><div data-combined-payment-qr hidden><p><strong>Scan to pay securely</strong></p></div><p class="status-note-error" data-combined-payment-error aria-live="polite"></p>';
+  panel.className = 'invoice-payment-panel';
+  panel.dataset.invoicePaymentPanel = 'true';
+
+  if (isPaid) {
+    panel.innerHTML = '<hr><h2>Payment received</h2><p>This invoice is marked paid. Thank you for choosing AllMovingParts LLC.</p>';
+    target.append(panel);
+    return;
+  }
+
+  if (cannotPayYet || isCancelled) {
+    panel.innerHTML = '<hr><h2>Online payment unavailable</h2><p>This invoice must be approved before a Stripe payment link can be created.</p>';
+    target.append(panel);
+    return;
+  }
+
+  panel.innerHTML = '<hr><h2>Pay this invoice</h2><p>Use the secure Stripe payment link below, or scan the QR code to pay this invoice on your phone. Available payment methods are shown by Stripe at checkout.</p><div class="receipt-actions"><a class="button button-primary" data-invoice-payment-link hidden target="_blank" rel="noopener noreferrer">Pay securely with Stripe</a><button type="button" class="button button-secondary" data-refresh-invoice-payment>Refresh payment link</button></div><div class="invoice-payment-qr" data-invoice-payment-qr hidden></div><p class="invoice-payment-status" data-invoice-qr-status aria-live="polite">Creating your secure Stripe payment link…</p><p class="status-note-error" data-invoice-payment-error aria-live="polite"></p>';
   target.append(panel);
 
-  const error = panel.querySelector('[data-combined-payment-error]');
-  const createLink = async (redirectToCheckout) => {
+  const createLink = async () => {
+    const link = panel.querySelector('[data-invoice-payment-link]');
+    const refresh = panel.querySelector('[data-refresh-invoice-payment]');
+    const error = panel.querySelector('[data-invoice-payment-error]');
+    const status = panel.querySelector('[data-invoice-qr-status]');
     error.textContent = '';
-    const controls = panel.querySelectorAll('button');
-    controls.forEach((button) => { button.disabled = true; });
+    status.textContent = 'Creating your secure Stripe payment link…';
+    refresh.disabled = true;
     try {
-      const url = await hhtCreateCombinedInvoicePaymentLink(order);
-      await hhtShowCombinedInvoicePaymentLink(panel, url);
-      if (redirectToCheckout) window.location.assign(url);
+      const url = await hhtCreateInvoicePaymentLink(order);
+      await hhtShowInvoicePaymentLink(panel, url);
     } catch (paymentError) {
-      error.textContent = paymentError.message || 'The secure payment link could not be created.';
+      status.textContent = '';
+      link.hidden = true;
+      error.textContent = paymentError.message || 'The Stripe payment link could not be created. Please try again.';
     } finally {
-      controls.forEach((button) => { button.disabled = false; });
+      refresh.disabled = false;
     }
   };
-  panel.querySelector('[data-pay-combined]').addEventListener('click', () => createLink(true));
-  panel.querySelector('[data-create-combined-link]').addEventListener('click', () => createLink(false));
+
+  panel.querySelector('[data-refresh-invoice-payment]').addEventListener('click', createLink);
+  createLink();
 }
-hhtAttachCombinedInvoicePayments();
+hhtAttachInvoicePayments();
 
 function hhtCombineInvoices(primaryId) {
   const orders = readOrders();
