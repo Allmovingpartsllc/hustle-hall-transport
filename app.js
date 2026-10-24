@@ -518,7 +518,8 @@ function openAdminOrderDetails(order) {
   dialog.className = 'order-details-dialog';
   dialog.innerHTML = `<div class="order-details-header"><div><p class="eyebrow">Request details</p><h2>${escapePortalText(order.id)}</h2></div><button type="button" class="order-details-close" aria-label="Close details">&times;</button></div><div class="admin-detail-grid">${fields.map(([label, value]) => {
     const isAddress = label === 'Pickup address' || label === 'Delivery address';
-    const content = isAddress && value ? `<a class="address-map-link" href="${mapsLink(value)}" target="_blank" rel="noopener noreferrer">${escapePortalText(value)}<small>Open in Google Maps ?</small></a>` : escapePortalText(value);
+    const mapText = label === 'Pickup address' ? 'Open pickup in Google Maps ↗' : 'Open drop-off in Google Maps ↗';
+    const content = isAddress && value ? `<a class="address-map-link" href="${mapsLink(value)}" target="_blank" rel="noopener noreferrer" aria-label="${mapText}">${escapePortalText(value)}<small>${mapText}</small></a>` : escapePortalText(value);
     return `<div><span>${escapePortalText(label)}</span><strong>${content}</strong></div>`;
   }).join('')}</div>${order.deliveryProof ? `<section class="delivery-proof"><h3>Proof of delivery</h3><p><strong>Signed by:</strong> ${escapePortalText(order.deliveryProof.signedBy || 'Not recorded')}</p>${order.deliveryProof.photo ? `<img src="${order.deliveryProof.photo}" alt="Delivery proof photo for ${escapePortalText(order.id)}">` : ''}${order.deliveryProof.signature ? `<img class="delivery-signature" src="${order.deliveryProof.signature}" alt="Customer signature">` : ''}</section>` : ''}<div class="order-details-actions"><a class="button button-primary" href="${calendarLink()}" target="_blank" rel="noopener noreferrer">Add to Google Calendar</a><a class="button button-secondary" href="receipt.html?id=${encodeURIComponent(order.id)}">Create Invoice</a><button type="button" class="button button-secondary" data-close-order-details>Close</button></div>`;
   document.body.append(dialog);
@@ -531,7 +532,7 @@ function openAdminOrderDetails(order) {
 
 document.addEventListener('click', (event) => {
   const orderLink = event.target.closest?.('[data-order-details], [data-admin-orders] td:first-child a');
-  if (!orderLink || window.matchMedia('(max-width: 760px)').matches) return;
+  if (!orderLink) return;
   event.preventDefault();
   const orderId = orderLink.dataset.orderDetails || new URL(orderLink.href, location.href).searchParams.get('id');
   const order = readOrders().find((savedOrder) => savedOrder.id === orderId);
