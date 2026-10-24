@@ -438,12 +438,7 @@ function renderAdmin() {
   const visibleOrders = getAdminFilteredOrders(orders);
   document.querySelector('[data-admin-stats]').innerHTML = `<article class="stat-card"><span>Total requests</span><strong>${orders.length}</strong></article><article class="stat-card"><span>Active requests</span><strong>${orders.filter((order) => !['Delivered', 'Completed', 'Rejected', 'Cancelled'].includes(order.status)).length}</strong></article><article class="stat-card"><span>Delivered revenue</span><strong>${money(delivered.reduce((sum, order) => sum + Number(order.total || 0), 0))}</strong></article>`;
   body.innerHTML = visibleOrders.length ? visibleOrders.map((order) => `<tr><td><a class="admin-order-link" data-order-details="${escapePortalText(order.id)}" href="receipt.html?id=${encodeURIComponent(order.id)}" aria-label="View details for order ${escapePortalText(order.id)}">${escapePortalText(order.id)}</a></td><td>${escapePortalText(order.customerName)}<br><small>${escapePortalText(order.phone)}</small></td><td>${escapePortalText(order.service)}</td><td>${order.preApprovalEstimate ? `Est. ${money(order.total)}` : (order.total ? money(order.total) : 'TBD')}</td><td><select data-status="${escapePortalText(order.id)}">${statuses.map((status) => `<option ${status === order.status ? 'selected' : ''}>${status}</option>`).join('')}</select></td><td><button type="button" class="button button-small button-primary" data-combine-row="${escapePortalText(order.id)}">Combine Invoices</button><a class="button button-secondary" href="receipt.html?id=${encodeURIComponent(order.id)}">Create Invoice</a><small class="order-request-time">Received: ${escapePortalText(order.createdAt || 'Not available')}</small><small class="order-completed-time">Completed: ${escapePortalText(order.completedAt || 'Not completed')}</small></td></tr>`).join('') : '<tr><td colspan="6">No requests match this filter.</td></tr>';
-  body.querySelectorAll('[data-order-details]').forEach((link) => link.addEventListener('click', (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const order = readOrders().find((savedOrder) => savedOrder.id === link.dataset.orderDetails);
-    if (order) openAdminOrderDetails(order);
-  }));
+  // Order-detail links are handled once through the shared document listener below.
   body.querySelectorAll('[data-combine-row]').forEach((button) => button.addEventListener('click', () => hhtCombineInvoices(button.dataset.combineRow))); body.querySelectorAll('[data-status]').forEach((element) => element.addEventListener('change', async () => {
     const nextStatus = element.value;
     const list = readOrders();
@@ -521,11 +516,19 @@ function openAdminOrderDetails(order) {
     const mapText = label === 'Pickup address' ? 'Open pickup in Google Maps ↗' : 'Open drop-off in Google Maps ↗';
     const content = isAddress && value ? `<a class="address-map-link" href="${mapsLink(value)}" target="_blank" rel="noopener noreferrer" aria-label="${mapText}">${escapePortalText(value)}<small>${mapText}</small></a>` : escapePortalText(value);
     return `<div><span>${escapePortalText(label)}</span><strong>${content}</strong></div>`;
-  }).join('')}</div>${order.deliveryProof ? `<section class="delivery-proof"><h3>Proof of delivery</h3><p><strong>Signed by:</strong> ${escapePortalText(order.deliveryProof.signedBy || 'Not recorded')}</p>${order.deliveryProof.photo ? `<img src="${order.deliveryProof.photo}" alt="Delivery proof photo for ${escapePortalText(order.id)}">` : ''}${order.deliveryProof.signature ? `<img class="delivery-signature" src="${order.deliveryProof.signature}" alt="Customer signature">` : ''}</section>` : ''}<div class="order-details-actions"><a class="button button-primary" href="${calendarLink()}" target="_blank" rel="noopener noreferrer">Add to Google Calendar</a><a class="button button-secondary" href="receipt.html?id=${encodeURIComponent(order.id)}">Create Invoice</a><button type="button" class="button button-secondary" data-close-order-details>Close</button></div>`;
+  }).join('')}</div>${order.deliveryProof ? `<section class="delivery-proof"><h3>Proof of delivery</h3><p><strong>Signed by:</strong> ${escapePortalText(order.deliveryProof.signedBy || 'Not recorded')}</p>${order.deliveryProof.photo ? `<img src="${order.deliveryProof.photo}" alt="Delivery proof photo for ${escapePortalText(order.id)}">` : ''}${order.deliveryProof.signature ? `<img class="delivery-signature" src="${order.deliveryProof.signature}" alt="Customer signature">` : ''}</section>` : ''}<div class="order-details-actions"><a class="button button-primary" href="${calendarLink()}" target="_blank" rel="noopener noreferrer">Add to Google Calendar</a><button type="button" class="button button-primary" data-edit-invoice>Edit invoice</button><button type="button" class="button button-secondary" data-combine-invoices>${order.combinedInvoice ? 'Update Combined Invoice' : 'Combine Invoices'}</button><a class="button button-secondary" href="receipt.html?id=${encodeURIComponent(order.id)}">Create Invoice</a><button type="button" class="button button-secondary" data-close-order-details>Close</button></div>`;
   document.body.append(dialog);
   const close = () => dialog.close();
   dialog.querySelector('.order-details-close').addEventListener('click', close);
   dialog.querySelector('[data-close-order-details]').addEventListener('click', close);
+  dialog.querySelector('[data-edit-invoice]').addEventListener('click', () => {
+    close();
+    hhtEditInvoice(order.id);
+  });
+  dialog.querySelector('[data-combine-invoices]').addEventListener('click', () => {
+    close();
+    hhtCombineInvoices(order.id);
+  });
   dialog.addEventListener('close', () => dialog.remove());
   dialog.showModal();
 }
@@ -759,6 +762,13 @@ async function cloudProfile(client, user) {
 
 let hhtDispatchChannel;
 let hhtDispatchPoll;
+let hhtLastCloudOrderSignature = '';
+function hhtOrderListSignature(orders) {
+  return orders.map((order) => [
+    order.id, order.status, order.total, order.createdAt, order.completedAt,
+    order.paymentStatus, order.cancellationNote, order.combinedInvoice?.id
+  ].join('|')).join('~');
+}
 async function syncCloudOrders() {
   try {
     const client = await hhtSupabaseReady;
@@ -772,9 +782,13 @@ async function syncCloudOrders() {
     const dashboardNotice = document.querySelector('.dashboard-note');
     if (dashboardNotice) dashboardNotice.textContent = 'Live dispatch is connected. New ride and delivery requests update automatically.';
     const orders = (data || []).map((row) => ({ ...row.payload, id: row.id, status: row.status, total: Number(row.total), createdAt: new Date(row.created_at).toLocaleString() }));
-    saveOrders(orders);
-    renderAdmin();
-    renderDriverOrders();
+    const signature = hhtOrderListSignature(orders);
+    if (signature !== hhtLastCloudOrderSignature) {
+      hhtLastCloudOrderSignature = signature;
+      saveOrders(orders);
+      renderAdmin();
+      renderDriverOrders();
+    }
     if (!hhtDispatchChannel && (adminOnlyPage || driverOnlyPage)) {
       hhtDispatchChannel = client.channel('hht-live-dispatch').on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => syncCloudOrders()).subscribe();
     }
@@ -1336,60 +1350,6 @@ function hhtEditInvoice(orderId) {
   dialog.showModal();
 }
 
-function hhtAttachInvoiceEditor() {
-  document
-    .querySelectorAll('dialog[open].order-details-dialog')
-    .forEach((dialog) => {
-      const actions = dialog.querySelector('.order-details-actions');
-
-      if (!actions || actions.querySelector('[data-edit-invoice]')) return;
-
-      const receipt = actions.querySelector('a[href^="receipt.html"]');
-      if (!receipt) return;
-
-      const orderId = new URL(receipt.href).searchParams.get('id');
-
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'button button-primary';
-      button.dataset.editInvoice = 'true';
-      button.textContent = 'Edit invoice';
-
-      button.addEventListener('click', () => {
-        dialog.close();
-        hhtEditInvoice(orderId);
-      });
-
-      actions.prepend(button);
-    });
-}
-
-new MutationObserver(hhtAttachInvoiceEditor).observe(document.body, {
-  childList: true,
-  subtree: true,
-  attributes: true,
-  attributeFilter: ['open']
-});
-
-hhtAttachInvoiceEditor();
-
-
-// Keeps the invoice actions clearly labeled in admin order details.
-function hhtAttachInvoiceLabels() {
-  document.querySelectorAll('dialog[open].order-details-dialog').forEach((dialog) => {
-    const receipt = dialog.querySelector('.order-details-actions a[href^="receipt.html"]');
-    if (receipt) receipt.textContent = 'Create Invoice';
-  });
-}
-
-new MutationObserver(hhtAttachInvoiceLabels).observe(document.body, {
-  childList: true,
-  subtree: true,
-  attributes: true,
-  attributeFilter: ['open']
-});
-
-hhtAttachInvoiceLabels();
 
 
 /* Combined invoice support */
@@ -1673,29 +1633,3 @@ function hhtCombineInvoices(primaryId) {
   dialog.showModal();
 }
 
-function hhtAttachCombinedInvoice() {
-  document.querySelectorAll('dialog[open].order-details-dialog').forEach((dialog) => {
-    const actions = dialog.querySelector('.order-details-actions');
-    const receipt = actions?.querySelector('a[href^="receipt.html"]');
-    if (!actions || !receipt || actions.querySelector('[data-combine-invoices]')) return;
-    const orderId = new URL(receipt.href).searchParams.get('id');
-    const order = readOrders().find((item) => item.id === orderId);
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'button button-secondary';
-    button.dataset.combineInvoices = 'true';
-    button.textContent = order?.combinedInvoice ? 'Update Combined Invoice' : 'Combine Invoices';
-    button.addEventListener('click', () => {
-      dialog.close();
-      hhtCombineInvoices(orderId);
-    });
-    actions.prepend(button);
-  });
-}
-new MutationObserver(hhtAttachCombinedInvoice).observe(document.body, {
-  childList: true,
-  subtree: true,
-  attributes: true,
-  attributeFilter: ['open']
-});
-hhtAttachCombinedInvoice();
