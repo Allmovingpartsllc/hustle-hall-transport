@@ -9,7 +9,7 @@ const PROMO_CODES = {
 };
 
 function isTuesdayFiveEligible(order) {
-  if (order.service !== 'ride' || order.rideType === 'multi') return false;
+  if (order.service !== 'ride' || (order.rideType && order.rideType !== 'single')) return false;
   const miles = Math.max(0, Number(order.miles) || 0);
   if (!order.date || !order.time || miles <= 0 || miles > 15) return false;
   const date = new Date(order.date + 'T12:00:00');
@@ -67,14 +67,30 @@ function calculateTotal(order) {
     throw new Error('Multi-day ride requests must be approved before payment.');
   }
 
-  const minutes = Math.max(0, Number(order.minutes) || 0);
-  const minimumFare = 5;
-  const base = 4;
-  const firstTierMiles = Math.min(miles, 20);
-  const longTripMiles = Math.max(0, miles - 20);
-  const mileCharge = (firstTierMiles * 0.85) + (longTripMiles * 0.75);
-  const minuteCharge = minutes * 0.12;
-  const subtotal = Math.max(minimumFare, base + mileCharge + minuteCharge);
+  const legFare = (legMiles, legMinutes) => {
+    const base = 3;
+    const mileage = Math.min(legMiles, 20) * 0.85 + Math.max(0, legMiles - 20) * 0.75;
+    return Math.max(5, base + mileage + legMinutes * 0.12);
+  };
+
+  let subtotal;
+  if (order.rideType === 'round') {
+    const outboundMiles = Number(order.outboundMiles);
+    const outboundMinutes = Number(order.outboundMinutes);
+    const returnMiles = Number(order.returnMiles);
+    const returnMinutes = Number(order.returnMinutes);
+    const departure = Date.parse(`${order.date || ''}T${order.time || ''}`);
+    const returnPickup = Date.parse(`${order.returnDate || ''}T${order.returnTime || ''}`);
+    if (![outboundMiles, outboundMinutes, returnMiles, returnMinutes].every(value => Number.isFinite(value) && value > 0)
+      || !Number.isFinite(departure) || !Number.isFinite(returnPickup)
+      || returnPickup < departure + outboundMinutes * 60000) {
+      throw new Error('A complete round-trip route and return pickup after the outbound arrival are required.');
+    }
+    subtotal = legFare(outboundMiles, outboundMinutes) + legFare(returnMiles, returnMinutes);
+  } else {
+    const minutes = Math.max(0, Number(order.minutes) || 0);
+    subtotal = legFare(miles, minutes);
+  }
 
   return Math.max(0, subtotal - calculatePromoDiscount(order, subtotal));
 }
