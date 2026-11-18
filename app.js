@@ -36,6 +36,7 @@ if (menuButton && mainNavigation) {
 const HHT_ORDERS = 'hht-orders';
 const PRICES = { small: 5, medium: 10, large: 20, extraLarge: 50 };
 const PROMO_MINIMUM_SUBTOTAL = 15;
+const RIDE_BASE_FARE = 3;
 const PROMO_CODES = {
   WELCOME10: { type: 'percent', value: 10, maxDiscount: 5, label: '10% off, up to $5' },
   LOCAL5: { type: 'fixed', value: 5, minimumSubtotal: 15, label: '$5 off orders of $15 or more' },
@@ -63,7 +64,8 @@ const money = (value) => `${Number(value || 0).toFixed(2)}`;
 
 function calculatePromo(form, subtotal, options = {}) {
   const enteredCode = String(form.elements.promoCode?.value || '').trim().toUpperCase();
-  const tuesdayFiveEligible = isTuesdayFiveEligible(form);
+  const validRideRoute = form.dataset.service === 'ride' && Number(form.elements.miles?.value || 0) > 0;
+  const tuesdayFiveEligible = validRideRoute && isTuesdayFiveEligible(form);
   let code = tuesdayFiveEligible ? 'TUESDAY5' : enteredCode;
   const message = form.querySelector('[data-promo-message]');
   const discountRow = form.querySelector('[data-promo-discount-row]');
@@ -74,7 +76,11 @@ function calculatePromo(form, subtotal, options = {}) {
   let accepted = false;
   let pending = false;
   let messageText = '';
-  if (code === 'TUESDAY5') {
+  const hasEligibleSubtotal = Number.isFinite(subtotal) && subtotal > 0;
+  const isMultiRideReady = !isMultiRide || Number(options.multiRideCount || 0) > 0;
+  if (!hasEligibleSubtotal || (form.dataset.service === 'ride' && (!validRideRoute || !isMultiRideReady))) {
+    messageText = 'Enter a valid route and required trip details to unlock eligible promotions.';
+  } else if (code === 'TUESDAY5') {
     if (tuesdayFiveEligible) {
       discount = Math.max(0, subtotal - 5);
       accepted = true;
@@ -101,17 +107,19 @@ function calculatePromo(form, subtotal, options = {}) {
     messageText = `Promo codes require a minimum order of ${money(Math.max(PROMO_MINIMUM_SUBTOTAL, promo?.minimumSubtotal || 0))} before discounts.`;
   } else if (promo) {
     const rawDiscount = promo.type === 'percent' ? subtotal * (promo.value / 100) : promo.value;
-    discount = Math.min(subtotal, promo.maxDiscount || rawDiscount);
+    discount = Math.min(subtotal, rawDiscount, promo.maxDiscount ?? rawDiscount);
     accepted = true;
     messageText = `${code} applied: ${promo.label}.`;
   }
   // Automatic ride discount, or whichever eligible offer saves the rider more.
-  if (form.dataset.service === 'ride' && subtotal * 0.20 > discount) {
+  if (validRideRoute && isMultiRideReady && hasEligibleSubtotal && subtotal * 0.20 > discount) {
     discount = subtotal * 0.20;
     code = 'AUTO20';
     accepted = true;
     messageText = '20% ride discount automatically applied. No code required.';
   }
+  // Guard against malformed amounts or future promo configuration changes.
+  discount = Number.isFinite(discount) ? Math.max(0, Math.min(subtotal, discount)) : 0;
   if (message) {
     message.textContent = messageText;
     message.classList.toggle('is-error', Boolean(code && !accepted));
@@ -191,7 +199,7 @@ function calculateRide(form) {
     const miles = Math.max(0, Number(form.elements.miles?.value || 0));
     const minutes = Math.max(0, Number(form.elements.minutes?.value || 0));
     const minimumFare = 5;
-    const base = 4;
+    const base = RIDE_BASE_FARE;
     const firstTierMiles = Math.min(miles, 20);
     const longTripMiles = Math.max(0, miles - 20);
     const mileCharge = (firstTierMiles * 0.85) + (longTripMiles * 0.75);
@@ -210,7 +218,7 @@ function calculateRide(form) {
   const miles = Math.max(0, Number(form.elements.miles?.value || 0));
   const minutes = Math.max(0, Number(form.elements.minutes?.value || 0));
   const minimumFare = 5;
-  const base = 4;
+  const base = RIDE_BASE_FARE;
   const firstTierMiles = Math.min(miles, 20);
   const longTripMiles = Math.max(0, miles - 20);
   const mileCharge = (firstTierMiles * 0.85) + (longTripMiles * 0.75);
@@ -247,7 +255,7 @@ function addSchedulingFields() {
 
 addSchedulingFields();
 
-document.querySelector('[data-service="ride"] .quote-card p:last-child')?.replaceChildren('No surge pricing. $4 base plus $0.85/mile for the first 20 miles, $0.75/mile after that, and $0.12/minute ($5 minimum before discounts). Automatic 20% savings are included. Tolls and route changes can affect the quote.');
+document.querySelector('[data-service="ride"] .quote-card p:last-child')?.replaceChildren('No surge pricing. $3 base plus $0.85/mile for the first 20 miles, $0.75/mile after that, and $0.12/minute ($5 minimum before discounts). Automatic 20% savings are included. Tolls and route changes can affect the quote.');
 
 function addPaymentFields() {
   document.querySelectorAll('[data-booking-form]').forEach((form) => {
@@ -307,7 +315,7 @@ function setupMultiRideBooking(form) {
     form.querySelector('.quote-total span')?.replaceChildren(isMultiRide ? 'Pre-approval estimate' : 'Estimated fare');
     quoteText.textContent = isMultiRide
       ? 'Choose whether you need one ride per service day or two rides per service day. Your pre-approval estimate is calculated using the number of service days multiplied by your selected rides per day. We will confirm availability and the final schedule before payment; route changes, added stops, tolls, or schedule changes may change the final price.'
-      : 'No surge pricing. $4 base plus $0.85/mile for the first 20 miles, $0.75/mile after that, and $0.12/minute ($5 minimum before discounts). Automatic 20% savings are included. Tolls and route changes can affect the quote.';
+      : 'No surge pricing. $3 base plus $0.85/mile for the first 20 miles, $0.75/mile after that, and $0.12/minute ($5 minimum before discounts). Automatic 20% savings are included. Tolls and route changes can affect the quote.';
     calculateRide(form);
   };
   rideType.addEventListener('change', refresh);
@@ -627,6 +635,11 @@ async function calculateRoute(form) {
   const inputs = [origin, ...form.querySelectorAll('[data-stop-address]'), destination];
   const status = form.querySelector('[data-route-status]');
   if (inputs.some(input => !input.value.trim())) {
+    if (form.dataset.service === 'ride') {
+      form.elements.miles.value = 0;
+      if (form.elements.minutes) form.elements.minutes.value = 0;
+      calculateRide(form);
+    }
     if (status) status.textContent = 'Enter all pickup, stop, and destination addresses.';
     return false;
   }
@@ -652,6 +665,11 @@ async function calculateRoute(form) {
     drawRoute(form, origin, destination, route.geometry.coordinates);
     return true;
   } catch (error) {
+    if (form.dataset.service === 'ride') {
+      form.elements.miles.value = 0;
+      if (form.elements.minutes) form.elements.minutes.value = 0;
+      calculateRide(form);
+    }
     if (status) status.textContent = error.message || 'Route calculation is unavailable.';
     return false;
   }
@@ -665,6 +683,11 @@ function setupAddressAutocomplete(form, input) {
   let timer;
   input.addEventListener('input', () => {
     delete input.dataset.lat; delete input.dataset.lon; clearTimeout(timer);
+    if (form.dataset.service === 'ride') {
+      form.elements.miles.value = 0;
+      if (form.elements.minutes) form.elements.minutes.value = 0;
+      calculateRide(form);
+    }
     const query = input.value.trim();
     if (query.length < 4) { suggestions.hidden = true; return; }
     timer = setTimeout(async () => {
@@ -707,6 +730,9 @@ document.querySelectorAll('[data-booking-form]').forEach(form => {
       remove.addEventListener('click', () => { row.remove(); update(); calculateRoute(form); });
       label.append(heading, input); row.append(label, remove); list.append(row);
       setupAddressAutocomplete(form, input); update();
+      form.elements.miles.value = 0;
+      if (form.elements.minutes) form.elements.minutes.value = 0;
+      calculateRide(form);
     });
     selection?.addEventListener('change', () => {
       const enabled = selection.value === 'yes';
