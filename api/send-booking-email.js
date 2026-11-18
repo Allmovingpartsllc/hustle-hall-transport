@@ -23,6 +23,15 @@ function details(order) {
     ['Pickup', order.pickup],
     ...((Array.isArray(order.stops) ? order.stops : []).map((stop, index) => [`Stop ${index + 1}`, stop.address || 'Not specified'])),
     ['Destination', order.delivery],
+    ...(order.rideType === 'round' ? [
+      ['Trip type', 'Round trip'],
+      ['Return pickup', order.returnPickup || order.delivery],
+      ['Return drop-off', order.returnDestination || order.pickup],
+      ['Return pickup date', order.returnDate || 'Not specified'],
+      ['Return pickup time', order.returnTime || 'Not specified'],
+      ['Outbound distance', order.outboundMiles ? `${order.outboundMiles} miles` : 'To be confirmed'],
+      ['Return distance', order.returnMiles ? `${order.returnMiles} miles` : 'To be confirmed']
+    ] : []),
     ['Requested date', order.date || 'Not specified'],
     ['Requested time', order.time || 'Not specified'],
     ['Preferred drop-off time', order.dropoffTime || 'Not specified'],
