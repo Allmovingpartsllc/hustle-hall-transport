@@ -46,7 +46,7 @@ const PROMO_CODES = {
 };
 
 function isTuesdayFiveEligible(form) {
-  if (form.dataset.service !== 'ride' || form.elements.rideType?.value === 'multi') return false;
+  if (form.dataset.service !== 'ride' || form.elements.rideType?.value !== 'single') return false;
   const miles = Math.max(0, Number(form.elements.miles?.value || 0));
   const dateValue = form.elements.date?.value;
   const timeValue = form.elements.time?.value;
@@ -188,6 +188,7 @@ function calculatePackage(form) {
 
 function calculateRide(form) {
   const isMultiRide = form.elements.rideType?.value === 'multi';
+  const isRoundTrip = form.elements.rideType?.value === 'round';
   if (isMultiRide) {
     const startDate = form.elements.startDate?.value;
     const endDate = form.elements.endDate?.value;
@@ -223,15 +224,27 @@ function calculateRide(form) {
   const longTripMiles = Math.max(0, miles - 20);
   const mileCharge = (firstTierMiles * 0.85) + (longTripMiles * 0.75);
   const minuteCharge = minutes * 0.12;
-  const subtotal = Math.max(minimumFare, base + mileCharge + minuteCharge);
+  const outboundFare = Math.max(minimumFare, base + mileCharge + minuteCharge);
+  const returnMiles = isRoundTrip ? Math.max(0, Number(form.dataset.returnMiles || 0)) : 0;
+  const returnMinutes = isRoundTrip ? Math.max(0, Number(form.dataset.returnMinutes || 0)) : 0;
+  const returnMileCharge = Math.min(returnMiles, 20) * 0.85 + Math.max(0, returnMiles - 20) * 0.75;
+  const returnMinuteCharge = returnMinutes * 0.12;
+  const returnFare = isRoundTrip && returnMiles > 0 ? Math.max(minimumFare, base + returnMileCharge + returnMinuteCharge) : 0;
+  const returnReady = !isRoundTrip || (returnMiles > 0 && Boolean(form.elements.returnTime?.value) && Boolean(form.elements.returnDate?.value));
+  const subtotal = returnReady ? outboundFare + returnFare : 0;
   const promo = calculatePromo(form, subtotal);
   const total = Math.max(0, subtotal - promo.promoDiscount);
-  form.querySelector('[data-ride-base]').textContent = money(base);
-  form.querySelector('[data-mile-charge]').textContent = money(mileCharge);
-  form.querySelector('[data-minute-charge]').textContent = money(minuteCharge);
-  form.querySelector('[data-ride-total]').textContent = money(total);
-  form.querySelector('.quote-total span')?.replaceChildren('Estimated fare');
-  return { base, minimumFare, miles, minutes, firstTierMiles, longTripMiles, mileCharge, minuteCharge, surcharge: 0, subtotal, total, quotePending: false, preApprovalEstimate: false, ...promo };
+  form.querySelector('[data-ride-base]').textContent = money(base * (isRoundTrip ? 2 : 1));
+  form.querySelector('[data-mile-charge]').textContent = money(mileCharge + returnMileCharge);
+  form.querySelector('[data-minute-charge]').textContent = money(minuteCharge + returnMinuteCharge);
+  form.querySelector('[data-ride-total]').textContent = returnReady ? money(total) : 'Calculate return';
+  form.querySelector('.quote-total span')?.replaceChildren(isRoundTrip ? 'Round-trip estimate' : 'Estimated fare');
+  const returnEstimate = form.querySelector('[data-return-estimate]');
+  if (returnEstimate) {
+    returnEstimate.hidden = !isRoundTrip;
+    returnEstimate.textContent = isRoundTrip ? (returnMiles > 0 ? `Outbound: ${money(outboundFare)} · Return: ${money(returnFare)} before discounts` : 'Enter your return date and time, then calculate the route.') : '';
+  }
+  return { base: base * (isRoundTrip ? 2 : 1), minimumFare, miles: miles + returnMiles, minutes: minutes + returnMinutes, outboundMiles: miles, outboundMinutes: minutes, returnMiles, returnMinutes, firstTierMiles, longTripMiles, mileCharge: mileCharge + returnMileCharge, minuteCharge: minuteCharge + returnMinuteCharge, outboundFare, returnFare, isRoundTrip, surcharge: 0, subtotal, total, quotePending: false, preApprovalEstimate: false, ...promo };
 }
 
 function addSchedulingFields() {
@@ -280,6 +293,7 @@ function setupMultiRideBooking(form) {
   if (form.dataset.service !== 'ride' || !form.elements.rideType) return;
   const rideType = form.elements.rideType;
   const multiFields = form.querySelector('[data-multi-ride-fields]');
+  const roundFields = form.querySelector('[data-round-trip-fields]');
   const routeTools = form.querySelector('.route-tools');
   const routeMap = form.querySelector('[data-route-map]');
   const distanceLabel = form.elements.miles?.closest('label');
@@ -290,6 +304,18 @@ function setupMultiRideBooking(form) {
   const refresh = () => {
     const isMultiRide = rideType.value === 'multi';
     multiFields.hidden = !isMultiRide;
+    const isRoundTrip = rideType.value === 'round';
+    if (roundFields) {
+      roundFields.hidden = !isRoundTrip;
+      roundFields.querySelectorAll('input').forEach(field => { field.disabled = !isRoundTrip; field.required = isRoundTrip; });
+      if (isRoundTrip && !form.elements.returnDate.value && form.elements.date?.value) form.elements.returnDate.value = form.elements.date.value;
+    }
+    if (form.dataset.lastRideType !== rideType.value) {
+      delete form.dataset.returnMiles; delete form.dataset.returnMinutes;
+      form.dataset.lastRideType = rideType.value;
+      if (form.elements.miles) form.elements.miles.value = 0;
+      if (form.elements.minutes) form.elements.minutes.value = 0;
+    }
     multiFields.querySelectorAll('input, textarea, select').forEach((field) => {
       field.disabled = !isMultiRide;
       field.required = isMultiRide;
@@ -313,13 +339,17 @@ function setupMultiRideBooking(form) {
     if (promoSection) promoSection.hidden = false;
     if (form.elements.promoCode) form.elements.promoCode.disabled = false;
     form.querySelector('.quote-total span')?.replaceChildren(isMultiRide ? 'Pre-approval estimate' : 'Estimated fare');
-    quoteText.textContent = isMultiRide
+    quoteText.textContent = isRoundTrip
+      ? 'Round trips include two separately calculated legs, with a $3 base fare per leg. Select your return date and pickup time. Automatic 20% ride savings apply when the complete route is valid.'
+      : isMultiRide
       ? 'Choose whether you need one ride per service day or two rides per service day. Your pre-approval estimate is calculated using the number of service days multiplied by your selected rides per day. We will confirm availability and the final schedule before payment; route changes, added stops, tolls, or schedule changes may change the final price.'
       : 'No surge pricing. $3 base plus $0.85/mile for the first 20 miles, $0.75/mile after that, and $0.12/minute ($5 minimum before discounts). Automatic 20% savings are included. Tolls and route changes can affect the quote.';
     calculateRide(form);
   };
   rideType.addEventListener('change', refresh);
   form.elements.ridesPerDay?.addEventListener('change', refresh);
+  form.elements.date?.addEventListener('change', () => { if (rideType.value === 'round' && form.elements.returnDate && !form.elements.returnDate.value) form.elements.returnDate.value = form.elements.date.value; });
+  [form.elements.returnDate, form.elements.returnTime].filter(Boolean).forEach(field => field.addEventListener('change', () => calculateRide(form)));
   refresh();
 }
 
@@ -349,6 +379,14 @@ document.querySelectorAll('[data-booking-form]').forEach((form) => {
       alert('Please enter valid pickup, stop, and destination addresses before booking.');
       unlockBooking(); return;
     }
+    if (form.dataset.service === 'ride' && form.elements.rideType?.value === 'round') {
+      const depart = new Date(`${form.elements.date.value}T${form.elements.time.value}`);
+      const back = new Date(`${form.elements.returnDate.value}T${form.elements.returnTime.value}`);
+      if (!form.elements.returnDate.value || !form.elements.returnTime.value || Number.isNaN(back.getTime()) || back <= depart) {
+        alert('Please choose a return pickup date and time after the outbound pickup.');
+        unlockBooking(); return;
+      }
+    }
     const fields = Object.fromEntries(new FormData(form));
     const quote = calculator(form);
     const addressFields = form.querySelectorAll('[data-address]');
@@ -365,6 +403,8 @@ document.querySelectorAll('[data-booking-form]').forEach((form) => {
       pickupLon: pickupField?.dataset.lon || '',
       deliveryLat: deliveryField?.dataset.lat || '',
       deliveryLon: deliveryField?.dataset.lon || '',
+      returnPickup: form.dataset.service === 'ride' && form.elements.rideType?.value === 'round' ? form.elements.delivery.value : '',
+      returnDestination: form.dataset.service === 'ride' && form.elements.rideType?.value === 'round' ? form.elements.pickup.value : '',
       stops: form.dataset.service === 'ride' ? [...form.querySelectorAll('[data-stop-address]')].map(input => ({ address: input.value, lat: input.dataset.lat, lon: input.dataset.lon })) : [],
       paymentStatus: quote.quotePending ? 'Quote pending' : (fields.paymentMethod === 'Stripe' ? 'Awaiting payment' : 'Pay in Person')
     };
@@ -409,7 +449,7 @@ document.querySelectorAll('[data-booking-form]').forEach((form) => {
   });
 });
 
-function orderDetails(order) { return `<div class="detail-list"><div><span>Service</span><strong>${order.service}</strong></div><div><span>Status</span><strong><i class="status-pill">${order.status}</i></strong></div><div><span>Pickup</span><strong>${order.pickup}</strong></div><div><span>Delivery</span><strong>${order.delivery}</strong></div>${Array.isArray(order.stops) ? order.stops.map((stop, index) => `<div><span>Stop ${index + 1}</span><strong>${escapePortalText(stop.address || '')}</strong></div>`).join('') : ''}<div><span>Customer</span><strong>${order.customerName}</strong></div><div><span>Phone</span><strong>${order.phone}</strong></div><div><span>Promo</span><strong>${order.promoCode ? (order.promoPending ? `${order.promoCode} (apply to final quote)` : `${order.promoCode} (-${money(order.promoDiscount)})`) : 'None'}</strong></div></div>`; }
+function orderDetails(order) { return `<div class="detail-list">${order.rideType === 'round' ? `<div><span>Trip type</span><strong>Round trip</strong></div><div><span>Return pickup</span><strong>${escapePortalText(order.returnPickup || order.delivery)}</strong></div><div><span>Return date &amp; time</span><strong>${escapePortalText((order.returnDate || '') + ' ' + (order.returnTime || ''))}</strong></div>` : ''}<div><span>Service</span><strong>${order.service}</strong></div><div><span>Status</span><strong><i class="status-pill">${order.status}</i></strong></div><div><span>Pickup</span><strong>${order.pickup}</strong></div><div><span>Delivery</span><strong>${order.delivery}</strong></div>${Array.isArray(order.stops) ? order.stops.map((stop, index) => `<div><span>Stop ${index + 1}</span><strong>${escapePortalText(stop.address || '')}</strong></div>`).join('') : ''}<div><span>Customer</span><strong>${order.customerName}</strong></div><div><span>Phone</span><strong>${order.phone}</strong></div><div><span>Promo</span><strong>${order.promoCode ? (order.promoPending ? `${order.promoCode} (apply to final quote)` : `${order.promoCode} (-${money(order.promoDiscount)})`) : 'None'}</strong></div></div>`; }
 
 const trackingForm = document.querySelector('[data-tracking-form]');
 if (trackingForm) trackingForm.addEventListener('submit', (event) => { event.preventDefault(); const q = new FormData(trackingForm).get('lookup').trim().toLowerCase(); const matches = readOrders().filter(o => o.id.toLowerCase() === q || o.phone.replace(/\D/g, '') === q.replace(/\D/g, '')); const result = document.querySelector('[data-tracking-result]'); result.innerHTML = matches.length ? matches.map(o => `<article class="result-card"><h2>${o.id}</h2>${orderDetails(o)}<a class="button button-small button-secondary" href="receipt.html?id=${encodeURIComponent(o.id)}">View receipt</a></article>`).join('') : '<p>No order was found. Check the receipt number or phone number and try again.</p>'; });
@@ -519,6 +559,7 @@ function openAdminOrderDetails(order) {
     ['Delivery address', order.delivery],
     ['Pickup date', order.date || 'Not specified'],
     ['Pickup time', order.time || 'Not specified'],
+    ...(order.rideType === 'round' ? [['Trip type', 'Round trip'], ['Return pickup', order.returnPickup || order.delivery], ['Return destination', order.returnDestination || order.pickup], ['Return date', order.returnDate], ['Return pickup time', order.returnTime]] : []),
     ['Preferred drop-off time', order.dropoffTime || 'Not specified'],
     ['Distance', order.miles ? `${order.miles} miles` : 'Not calculated'],
     [order.preApprovalEstimate ? 'Pre-approval estimate' : 'Estimated total', money(order.total)]
@@ -638,6 +679,7 @@ async function calculateRoute(form) {
     if (form.dataset.service === 'ride') {
       form.elements.miles.value = 0;
       if (form.elements.minutes) form.elements.minutes.value = 0;
+      delete form.dataset.returnMiles; delete form.dataset.returnMinutes;
       calculateRide(form);
     }
     if (status) status.textContent = 'Enter all pickup, stop, and destination addresses.';
@@ -653,21 +695,39 @@ async function calculateRoute(form) {
         input.dataset.lat = place.lat; input.dataset.lon = place.lon;
       }
     }
+    const isRoundTrip = form.dataset.service === 'ride' && form.elements.rideType?.value === 'round';
+    if (isRoundTrip) {
+      const depart = new Date(`${form.elements.date?.value}T${form.elements.time?.value}`);
+      const back = new Date(`${form.elements.returnDate?.value}T${form.elements.returnTime?.value}`);
+      if (!form.elements.returnDate?.value || !form.elements.returnTime?.value || Number.isNaN(back.getTime()) || back <= depart) throw new Error('Choose a return pickup date and time after departure.');
+    }
     const coords = inputs.map(input => `${input.dataset.lon},${input.dataset.lat}`).join(';');
     const response = await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`);
     const data = await response.json();
     if (!response.ok || data.code !== 'Ok' || !data.routes?.[0]) throw new Error('A driving route was not found.');
     const route = data.routes[0];
+    if (isRoundTrip) {
+      // Return travel is quoted separately because one-way streets can change its distance and duration.
+      const returnCoords = [destination, origin].map(input => `${input.dataset.lon},${input.dataset.lat}`).join(';');
+      const returnResponse = await fetch(`https://router.project-osrm.org/route/v1/driving/${returnCoords}?overview=false`);
+      const returnData = await returnResponse.json();
+      if (!returnResponse.ok || returnData.code !== 'Ok' || !returnData.routes?.[0]) throw new Error('The return driving route could not be calculated.');
+      form.dataset.returnMiles = (returnData.routes[0].distance / 1609.344).toFixed(1);
+      form.dataset.returnMinutes = String(Math.max(1, Math.ceil(returnData.routes[0].duration / 60)));
+    } else {
+      delete form.dataset.returnMiles; delete form.dataset.returnMinutes;
+    }
     form.elements.miles.value = (route.distance / 1609.344).toFixed(1);
     if (form.elements.minutes) form.elements.minutes.value = Math.max(1, Math.ceil(route.duration / 60));
     (form.dataset.service === 'package' ? calculatePackage : calculateRide)(form);
-    if (status) status.textContent = `${form.elements.miles.value} miles · ${form.elements.minutes?.value || 0} minutes · ${inputs.length - 2} stop(s)`;
+    if (status) status.textContent = isRoundTrip ? `Outbound ${form.elements.miles.value} mi · Return ${form.dataset.returnMiles} mi · ${inputs.length - 2} outbound stop(s)` : `${form.elements.miles.value} miles · ${form.elements.minutes?.value || 0} minutes · ${inputs.length - 2} stop(s)`;
     drawRoute(form, origin, destination, route.geometry.coordinates);
     return true;
   } catch (error) {
     if (form.dataset.service === 'ride') {
       form.elements.miles.value = 0;
       if (form.elements.minutes) form.elements.minutes.value = 0;
+      delete form.dataset.returnMiles; delete form.dataset.returnMinutes;
       calculateRide(form);
     }
     if (status) status.textContent = error.message || 'Route calculation is unavailable.';
@@ -686,6 +746,7 @@ function setupAddressAutocomplete(form, input) {
     if (form.dataset.service === 'ride') {
       form.elements.miles.value = 0;
       if (form.elements.minutes) form.elements.minutes.value = 0;
+      delete form.dataset.returnMiles; delete form.dataset.returnMinutes;
       calculateRide(form);
     }
     const query = input.value.trim();
@@ -732,6 +793,7 @@ document.querySelectorAll('[data-booking-form]').forEach(form => {
       setupAddressAutocomplete(form, input); update();
       form.elements.miles.value = 0;
       if (form.elements.minutes) form.elements.minutes.value = 0;
+      delete form.dataset.returnMiles; delete form.dataset.returnMinutes;
       calculateRide(form);
     });
     selection?.addEventListener('change', () => {
@@ -741,6 +803,7 @@ document.querySelectorAll('[data-booking-form]').forEach(form => {
       if (!enabled) { list.replaceChildren(); update(); }
       form.elements.miles.value = 0;
       if (form.elements.minutes) form.elements.minutes.value = 0;
+      delete form.dataset.returnMiles; delete form.dataset.returnMinutes;
       calculateRide(form);
       if (form.elements.pickup?.value && form.elements.delivery?.value && !enabled) calculateRoute(form);
     });
