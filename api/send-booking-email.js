@@ -21,6 +21,7 @@ function details(order) {
     ['Customer', order.customerName],
     ['Phone', order.phone],
     ['Pickup', order.pickup],
+    ...((Array.isArray(order.stops) ? order.stops : []).map((stop, index) => [`Stop ${index + 1}`, stop.address || 'Not specified'])),
     ['Destination', order.delivery],
     ['Requested date', order.date || 'Not specified'],
     ['Requested time', order.time || 'Not specified'],

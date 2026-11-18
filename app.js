@@ -64,7 +64,7 @@ const money = (value) => `${Number(value || 0).toFixed(2)}`;
 function calculatePromo(form, subtotal, options = {}) {
   const enteredCode = String(form.elements.promoCode?.value || '').trim().toUpperCase();
   const tuesdayFiveEligible = isTuesdayFiveEligible(form);
-  const code = tuesdayFiveEligible ? 'TUESDAY5' : enteredCode;
+  let code = tuesdayFiveEligible ? 'TUESDAY5' : enteredCode;
   const message = form.querySelector('[data-promo-message]');
   const discountRow = form.querySelector('[data-promo-discount-row]');
   const discountValue = form.querySelector('[data-promo-discount]');
@@ -105,6 +105,13 @@ function calculatePromo(form, subtotal, options = {}) {
     accepted = true;
     messageText = `${code} applied: ${promo.label}.`;
   }
+  // Automatic ride discount, or whichever eligible offer saves the rider more.
+  if (form.dataset.service === 'ride' && subtotal * 0.20 > discount) {
+    discount = subtotal * 0.20;
+    code = 'AUTO20';
+    accepted = true;
+    messageText = '20% ride discount automatically applied. No code required.';
+  }
   if (message) {
     message.textContent = messageText;
     message.classList.toggle('is-error', Boolean(code && !accepted));
@@ -112,7 +119,7 @@ function calculatePromo(form, subtotal, options = {}) {
   }
   if (discountRow) discountRow.hidden = !discount;
   if (discountValue) discountValue.textContent = `-${money(discount)}`;
-  return { promoCode: accepted ? code : '', promoDiscount: discount, promoLabel: accepted ? promo.label : '', promoPending: pending, autoPromo: accepted && code === 'TUESDAY5' };
+  return { promoCode: accepted ? code : '', promoDiscount: discount, promoLabel: accepted ? (code === 'AUTO20' ? 'Automatic 20% off' : (PROMO_CODES[code]?.label || '')) : '', promoPending: pending, autoPromo: accepted && code === 'TUESDAY5' };
 }
 const makeId = () => `HHT-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}-${String(Date.now()).slice(-5)}`;
 
@@ -184,11 +191,11 @@ function calculateRide(form) {
     const miles = Math.max(0, Number(form.elements.miles?.value || 0));
     const minutes = Math.max(0, Number(form.elements.minutes?.value || 0));
     const minimumFare = 5;
-    const base = 5;
+    const base = 4;
     const firstTierMiles = Math.min(miles, 20);
     const longTripMiles = Math.max(0, miles - 20);
-    const mileCharge = (firstTierMiles * 0.95) + (longTripMiles * 0.85);
-    const minuteCharge = minutes * 0.15;
+    const mileCharge = (firstTierMiles * 0.85) + (longTripMiles * 0.75);
+    const minuteCharge = minutes * 0.12;
     const perRideEstimate = Math.max(minimumFare, base + mileCharge + minuteCharge);
     const subtotal = estimatedRideCount ? perRideEstimate * estimatedRideCount : 0;
     const promo = calculatePromo(form, subtotal, { multiRideCount: estimatedRideCount });
@@ -203,11 +210,11 @@ function calculateRide(form) {
   const miles = Math.max(0, Number(form.elements.miles?.value || 0));
   const minutes = Math.max(0, Number(form.elements.minutes?.value || 0));
   const minimumFare = 5;
-  const base = 5;
+  const base = 4;
   const firstTierMiles = Math.min(miles, 20);
   const longTripMiles = Math.max(0, miles - 20);
-  const mileCharge = (firstTierMiles * 0.95) + (longTripMiles * 0.85);
-  const minuteCharge = minutes * 0.15;
+  const mileCharge = (firstTierMiles * 0.85) + (longTripMiles * 0.75);
+  const minuteCharge = minutes * 0.12;
   const subtotal = Math.max(minimumFare, base + mileCharge + minuteCharge);
   const promo = calculatePromo(form, subtotal);
   const total = Math.max(0, subtotal - promo.promoDiscount);
@@ -240,7 +247,7 @@ function addSchedulingFields() {
 
 addSchedulingFields();
 
-document.querySelector('[data-service="ride"] .quote-card p:last-child')?.replaceChildren('No surge pricing. $5 base fare, plus $0.95 per mile for the first 20 miles, $0.85 per mile after 20 miles, and $0.15 per minute. This is an estimate; tolls, added stops, or route changes may change the final total.');
+document.querySelector('[data-service="ride"] .quote-card p:last-child')?.replaceChildren('No surge pricing. $4 base plus $0.85/mile for the first 20 miles, $0.75/mile after that, and $0.12/minute ($5 minimum before discounts). Automatic 20% savings are included. Tolls and route changes can affect the quote.');
 
 function addPaymentFields() {
   document.querySelectorAll('[data-booking-form]').forEach((form) => {
@@ -300,7 +307,7 @@ function setupMultiRideBooking(form) {
     form.querySelector('.quote-total span')?.replaceChildren(isMultiRide ? 'Pre-approval estimate' : 'Estimated fare');
     quoteText.textContent = isMultiRide
       ? 'Choose whether you need one ride per service day or two rides per service day. Your pre-approval estimate is calculated using the number of service days multiplied by your selected rides per day. We will confirm availability and the final schedule before payment; route changes, added stops, tolls, or schedule changes may change the final price.'
-      : 'No surge pricing. $5 base fare, plus $0.95 per mile for the first 20 miles, $0.85 per mile after 20 miles, and $0.15 per minute. This is an estimate; tolls, added stops, or route changes may change the final total.';
+      : 'No surge pricing. $4 base plus $0.85/mile for the first 20 miles, $0.75/mile after that, and $0.12/minute ($5 minimum before discounts). Automatic 20% savings are included. Tolls and route changes can affect the quote.';
     calculateRide(form);
   };
   rideType.addEventListener('change', refresh);
@@ -330,6 +337,10 @@ document.querySelectorAll('[data-booking-form]').forEach((form) => {
         submitButton.textContent = form.dataset.service === 'package' ? 'Submit delivery request →' : 'Request a ride →';
       }
     };
+    if (form.dataset.service === 'ride' && !(await calculateRoute(form))) {
+      alert('Please enter valid pickup, stop, and destination addresses before booking.');
+      unlockBooking(); return;
+    }
     const fields = Object.fromEntries(new FormData(form));
     const quote = calculator(form);
     const addressFields = form.querySelectorAll('[data-address]');
@@ -346,6 +357,7 @@ document.querySelectorAll('[data-booking-form]').forEach((form) => {
       pickupLon: pickupField?.dataset.lon || '',
       deliveryLat: deliveryField?.dataset.lat || '',
       deliveryLon: deliveryField?.dataset.lon || '',
+      stops: form.dataset.service === 'ride' ? [...form.querySelectorAll('[data-stop-address]')].map(input => ({ address: input.value, lat: input.dataset.lat, lon: input.dataset.lon })) : [],
       paymentStatus: quote.quotePending ? 'Quote pending' : (fields.paymentMethod === 'Stripe' ? 'Awaiting payment' : 'Pay in Person')
     };
     const availability = await checkRideAvailability(order);
@@ -389,7 +401,7 @@ document.querySelectorAll('[data-booking-form]').forEach((form) => {
   });
 });
 
-function orderDetails(order) { return `<div class="detail-list"><div><span>Service</span><strong>${order.service}</strong></div><div><span>Status</span><strong><i class="status-pill">${order.status}</i></strong></div><div><span>Pickup</span><strong>${order.pickup}</strong></div><div><span>Delivery</span><strong>${order.delivery}</strong></div><div><span>Customer</span><strong>${order.customerName}</strong></div><div><span>Phone</span><strong>${order.phone}</strong></div><div><span>Promo</span><strong>${order.promoCode ? (order.promoPending ? `${order.promoCode} (apply to final quote)` : `${order.promoCode} (-${money(order.promoDiscount)})`) : 'None'}</strong></div></div>`; }
+function orderDetails(order) { return `<div class="detail-list"><div><span>Service</span><strong>${order.service}</strong></div><div><span>Status</span><strong><i class="status-pill">${order.status}</i></strong></div><div><span>Pickup</span><strong>${order.pickup}</strong></div><div><span>Delivery</span><strong>${order.delivery}</strong></div>${Array.isArray(order.stops) ? order.stops.map((stop, index) => `<div><span>Stop ${index + 1}</span><strong>${escapePortalText(stop.address || '')}</strong></div>`).join('') : ''}<div><span>Customer</span><strong>${order.customerName}</strong></div><div><span>Phone</span><strong>${order.phone}</strong></div><div><span>Promo</span><strong>${order.promoCode ? (order.promoPending ? `${order.promoCode} (apply to final quote)` : `${order.promoCode} (-${money(order.promoDiscount)})`) : 'None'}</strong></div></div>`; }
 
 const trackingForm = document.querySelector('[data-tracking-form]');
 if (trackingForm) trackingForm.addEventListener('submit', (event) => { event.preventDefault(); const q = new FormData(trackingForm).get('lookup').trim().toLowerCase(); const matches = readOrders().filter(o => o.id.toLowerCase() === q || o.phone.replace(/\D/g, '') === q.replace(/\D/g, '')); const result = document.querySelector('[data-tracking-result]'); result.innerHTML = matches.length ? matches.map(o => `<article class="result-card"><h2>${o.id}</h2>${orderDetails(o)}<a class="button button-small button-secondary" href="receipt.html?id=${encodeURIComponent(o.id)}">View receipt</a></article>`).join('') : '<p>No order was found. Check the receipt number or phone number and try again.</p>'; });
@@ -575,7 +587,7 @@ function openDeliveryProof(order) {
 }
 function renderDriverOrders() {
   if (!driverOrders) return; const orders = readOrders().filter((order) => !['Cancelled', 'Rejected', 'Completed'].includes(order.status));
-  driverOrders.innerHTML = orders.length ? orders.map((order) => { const text = encodeURIComponent(`Hustle Hall Transport update: Your ${order.service === 'package' ? 'delivery' : 'ride'} request ${order.id} is currently ${order.status}.`); return `<article class="driver-card"><div><h2>${escapePortalText(order.id)} <i class="status-pill">${escapePortalText(order.status)}</i></h2><p><strong>Pickup:</strong> ${escapePortalText(order.pickup)}</p><p><strong>Delivery:</strong> ${escapePortalText(order.delivery)}</p><p><strong>Customer:</strong> ${escapePortalText(order.customerName)} � ${escapePortalText(order.phone)}</p></div><div class="driver-actions"><a class="button button-secondary" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(order.pickup)}&destination=${encodeURIComponent(order.delivery)}">Navigate</a><a class="button button-secondary" href="sms:${String(order.phone || '').replace(/\D/g, '')}?body=${text}">Text customer</a><button class="button button-secondary" type="button" data-driver-status="${escapePortalText(order.id)}" data-next-status="Picked Up">Mark picked up</button><button class="button button-primary" type="button" data-complete-delivery="${escapePortalText(order.id)}">Complete delivery</button></div></article>`; }).join('') : '<p>No active requests are available in this browser yet.</p>';
+  driverOrders.innerHTML = orders.length ? orders.map((order) => { const text = encodeURIComponent(`Hustle Hall Transport update: Your ${order.service === 'package' ? 'delivery' : 'ride'} request ${order.id} is currently ${order.status}.`); return `<article class="driver-card"><div><h2>${escapePortalText(order.id)} <i class="status-pill">${escapePortalText(order.status)}</i></h2><p><strong>Pickup:</strong> ${escapePortalText(order.pickup)}</p><p><strong>Delivery:</strong> ${escapePortalText(order.delivery)}</p>${Array.isArray(order.stops) ? order.stops.map((stop, index) => `<p><strong>Stop ${index + 1}:</strong> ${escapePortalText(stop.address || '')}</p>`).join('') : ''}<p><strong>Customer:</strong> ${escapePortalText(order.customerName)} � ${escapePortalText(order.phone)}</p></div><div class="driver-actions"><a class="button button-secondary" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(order.pickup)}&destination=${encodeURIComponent(order.delivery)}${Array.isArray(order.stops) && order.stops.length ? `&waypoints=${encodeURIComponent(order.stops.map(stop => stop.address).join('|'))}` : ''}">Navigate</a><a class="button button-secondary" href="sms:${String(order.phone || '').replace(/\D/g, '')}?body=${text}">Text customer</a><button class="button button-secondary" type="button" data-driver-status="${escapePortalText(order.id)}" data-next-status="Picked Up">Mark picked up</button><button class="button button-primary" type="button" data-complete-delivery="${escapePortalText(order.id)}">Complete delivery</button></div></article>`; }).join('') : '<p>No active requests are available in this browser yet.</p>';
   driverOrders.querySelectorAll('[data-driver-status]').forEach((button) => button.addEventListener('click', async () => { const order = readOrders().find((item) => item.id === button.dataset.driverStatus); if (!order) return; order.status = button.dataset.nextStatus; await saveDriverOrder(order); renderDriverOrders(); }));
   driverOrders.querySelectorAll('[data-complete-delivery]').forEach((button) => button.addEventListener('click', () => { const order = readOrders().find((item) => item.id === button.dataset.completeDelivery); if (order) openDeliveryProof(order); }));
 }
@@ -605,64 +617,96 @@ function drawRoute(form, origin, destination, coordinates) {
   if (mapElement._markers) mapElement._markers.forEach((marker) => map.removeLayer(marker));
   const points = coordinates.map(([longitude, latitude]) => [latitude, longitude]);
   mapElement._route = L.polyline(points, { color: '#e82d7c', weight: 5 }).addTo(map);
-  mapElement._markers = [L.marker([origin.dataset.lat, origin.dataset.lon]).addTo(map), L.marker([destination.dataset.lat, destination.dataset.lon]).addTo(map)];
+  mapElement._markers = [origin, ...form.querySelectorAll('[data-stop-address]'), destination].map(field => L.marker([field.dataset.lat, field.dataset.lon]).addTo(map));
   map.fitBounds(mapElement._route.getBounds(), { padding: [24, 24] });
 }
 
+
 async function calculateRoute(form) {
-  const [origin, destination] = form.querySelectorAll('[data-address]');
+  const origin = form.elements.pickup, destination = form.elements.delivery;
+  const inputs = [origin, ...form.querySelectorAll('[data-stop-address]'), destination];
   const status = form.querySelector('[data-route-status]');
-  if (!origin.value.trim() || !destination.value.trim()) { status.textContent = 'Enter both addresses first.'; return; }
+  if (inputs.some(input => !input.value.trim())) {
+    if (status) status.textContent = 'Enter all pickup, stop, and destination addresses.';
+    return false;
+  }
   try {
-    status.textContent = 'Finding the best driving route.';
-    for (const input of [origin, destination]) {
-      if (!input.dataset.lat) {
+    if (status) status.textContent = 'Calculating the complete route…';
+    for (const input of inputs) {
+      if (!input.dataset.lat || !input.dataset.lon) {
         const [place] = await geocodeAddress(input.value);
-        if (!place) throw new Error('We could not find one of those addresses.');
+        if (!place) throw new Error('One of the route addresses could not be found.');
         input.value = place.display_name;
-        input.dataset.lat = place.lat;
-        input.dataset.lon = place.lon;
+        input.dataset.lat = place.lat; input.dataset.lon = place.lon;
       }
     }
-    const endpoint = `https://router.project-osrm.org/route/v1/driving/${origin.dataset.lon},${origin.dataset.lat};${destination.dataset.lon},${destination.dataset.lat}?overview=full&geometries=geojson`;
-    const response = await fetch(endpoint);
-    const routeData = await response.json();
-    if (!response.ok || routeData.code !== 'Ok' || !routeData.routes?.[0]) throw new Error('A driving route was not found.');
-    const route = routeData.routes[0];
+    const coords = inputs.map(input => `${input.dataset.lon},${input.dataset.lat}`).join(';');
+    const response = await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`);
+    const data = await response.json();
+    if (!response.ok || data.code !== 'Ok' || !data.routes?.[0]) throw new Error('A driving route was not found.');
+    const route = data.routes[0];
     form.elements.miles.value = (route.distance / 1609.344).toFixed(1);
-    if (form.elements.minutes) form.elements.minutes.value = Math.max(1, Math.round(route.duration / 60));
+    if (form.elements.minutes) form.elements.minutes.value = Math.max(1, Math.ceil(route.duration / 60));
     (form.dataset.service === 'package' ? calculatePackage : calculateRide)(form);
-    status.textContent = `${form.elements.miles.value} miles${form.elements.minutes ? ` � ${form.elements.minutes.value} minutes` : ''} estimated`;
+    if (status) status.textContent = `${form.elements.miles.value} miles · ${form.elements.minutes?.value || 0} minutes · ${inputs.length - 2} stop(s)`;
     drawRoute(form, origin, destination, route.geometry.coordinates);
-  } catch (error) { status.textContent = error.message || 'Route calculation is currently unavailable.'; }
+    return true;
+  } catch (error) {
+    if (status) status.textContent = error.message || 'Route calculation is unavailable.';
+    return false;
+  }
 }
-
-document.querySelectorAll('[data-booking-form]').forEach((form) => {
-  const addressInputs = form.querySelectorAll('[data-address]');
-  if (!addressInputs.length) return;
-  addressInputs.forEach((input) => {
-    const suggestions = document.createElement('div');
-    suggestions.className = 'address-suggestions'; suggestions.hidden = true;
-    input.parentElement.append(suggestions);
-    let timer;
-    input.addEventListener('input', () => {
-      delete input.dataset.lat; delete input.dataset.lon; clearTimeout(timer);
-      const query = input.value.trim();
-      if (query.length < 4) { suggestions.hidden = true; return; }
-      timer = setTimeout(async () => {
-        try {
-          const places = await geocodeAddress(query);
-          suggestions.innerHTML = places.map((place) => `<button type="button" data-lat="${place.lat}" data-lon="${place.lon}">${place.display_name}</button>`).join('');
-          suggestions.hidden = !places.length;
-          suggestions.querySelectorAll('button').forEach((choice) => choice.addEventListener('click', () => {
-            input.value = choice.textContent; input.dataset.lat = choice.dataset.lat; input.dataset.lon = choice.dataset.lon; suggestions.hidden = true;
-            if ([...addressInputs].every((field) => field.dataset.lat)) calculateRoute(form);
-          }));
-        } catch { suggestions.hidden = true; }
-      }, 850);
-    });
-    input.addEventListener('blur', () => setTimeout(() => { suggestions.hidden = true; }, 180));
+function setupAddressAutocomplete(form, input) {
+  if (input.dataset.autocompleteReady) return;
+  input.dataset.autocompleteReady = '1';
+  const suggestions = document.createElement('div');
+  suggestions.className = 'address-suggestions'; suggestions.hidden = true;
+  input.parentElement.append(suggestions);
+  let timer;
+  input.addEventListener('input', () => {
+    delete input.dataset.lat; delete input.dataset.lon; clearTimeout(timer);
+    const query = input.value.trim();
+    if (query.length < 4) { suggestions.hidden = true; return; }
+    timer = setTimeout(async () => {
+      try {
+        const places = await geocodeAddress(query);
+        suggestions.replaceChildren();
+        places.forEach(place => {
+          const choice = document.createElement('button');
+          choice.type = 'button'; choice.textContent = place.display_name;
+          choice.addEventListener('click', () => {
+            input.value = place.display_name;
+            input.dataset.lat = place.lat; input.dataset.lon = place.lon;
+            suggestions.hidden = true;
+            if ([form.elements.pickup, ...form.querySelectorAll('[data-stop-address]'), form.elements.delivery].every(field => field?.dataset.lat)) calculateRoute(form);
+          });
+          suggestions.append(choice);
+        });
+        suggestions.hidden = !places.length;
+      } catch { suggestions.hidden = true; }
+    }, 850);
   });
+  input.addEventListener('blur', () => setTimeout(() => { suggestions.hidden = true; }, 180));
+}
+document.querySelectorAll('[data-booking-form]').forEach(form => {
+  form.querySelectorAll('[data-address]').forEach(input => setupAddressAutocomplete(form, input));
+  if (form.dataset.service === 'ride') {
+    const list = form.querySelector('[data-stops-list]'), add = form.querySelector('[data-add-stop]');
+    const update = () => {
+      list.querySelectorAll('[data-stop-row]').forEach((row, index) => { row.querySelector('[data-stop-label]').textContent = `Stop ${index + 1}`; });
+      add.disabled = list.querySelectorAll('[data-stop-row]').length >= 8;
+    };
+    add?.addEventListener('click', () => {
+      const row = document.createElement('div'); row.className = 'form-grid'; row.dataset.stopRow = '1';
+      const label = document.createElement('label'); label.className = 'form-wide';
+      const heading = document.createElement('span'); heading.dataset.stopLabel = '1';
+      const input = document.createElement('input'); input.name = 'stopAddress'; input.dataset.stopAddress = '1'; input.dataset.address = '1'; input.required = true; input.placeholder = 'Stop address';
+      const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'button button-secondary'; remove.textContent = 'Remove stop';
+      remove.addEventListener('click', () => { row.remove(); update(); calculateRoute(form); });
+      label.append(heading, input); row.append(label, remove); list.append(row);
+      setupAddressAutocomplete(form, input); update();
+    });
+  }
   form.querySelector('[data-route-calc]')?.addEventListener('click', () => calculateRoute(form));
 });
 // Local account demo. Replace with server-side authentication before public launch.

@@ -20,23 +20,24 @@ function isTuesdayFiveEligible(order) {
 }
 
 function calculatePromoDiscount(order, subtotal) {
-  if (isTuesdayFiveEligible(order)) return Math.max(0, subtotal - 5);
+  const autoDiscount = order.service === 'ride' ? subtotal * 0.2 : 0;
+  if (isTuesdayFiveEligible(order)) return Math.max(autoDiscount, subtotal - 5);
 
   const code = String(order.promoCode || '').trim().toUpperCase();
-  if (!code || code === 'TUESDAY5') return 0;
+  if (!code || code === 'TUESDAY5' || code === 'AUTO20') return autoDiscount;
 
   const promo = PROMO_CODES[code];
-  if (!promo) return 0;
-  if (promo.service && promo.service !== order.service) return 0;
+  if (!promo) return autoDiscount;
+  if (promo.service && promo.service !== order.service) return autoDiscount;
 
   const minimum = Math.max(PROMO_MINIMUM_SUBTOTAL, promo.minimumSubtotal || 0);
-  if (subtotal < minimum) return 0;
+  if (subtotal < minimum) return autoDiscount;
 
   const rawDiscount = promo.type === 'percent'
     ? subtotal * (promo.value / 100)
     : promo.value;
 
-  return Math.min(subtotal, promo.maxDiscount || rawDiscount, rawDiscount);
+  return Math.max(autoDiscount, Math.min(subtotal, promo.maxDiscount || rawDiscount, rawDiscount));
 }
 
 function calculateCombinedInvoiceTotal(order) {
@@ -68,14 +69,12 @@ function calculateTotal(order) {
 
   const minutes = Math.max(0, Number(order.minutes) || 0);
   const minimumFare = 5;
-  const base = 5;
+  const base = 4;
   const firstTierMiles = Math.min(miles, 20);
   const longTripMiles = Math.max(0, miles - 20);
-  const mileCharge = (firstTierMiles * 0.95) + (longTripMiles * 0.85);
-  const minuteCharge = minutes * 0.15;
+  const mileCharge = (firstTierMiles * 0.85) + (longTripMiles * 0.75);
+  const minuteCharge = minutes * 0.12;
   const subtotal = Math.max(minimumFare, base + mileCharge + minuteCharge);
-
-  if (isTuesdayFiveEligible(order)) return 5;
 
   return Math.max(0, subtotal - calculatePromoDiscount(order, subtotal));
 }
