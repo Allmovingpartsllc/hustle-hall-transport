@@ -692,6 +692,8 @@ document.querySelectorAll('[data-booking-form]').forEach(form => {
   form.querySelectorAll('[data-address]').forEach(input => setupAddressAutocomplete(form, input));
   if (form.dataset.service === 'ride') {
     const list = form.querySelector('[data-stops-list]'), add = form.querySelector('[data-add-stop]');
+    const selection = form.querySelector('[data-add-stops-selection]');
+    const fields = form.querySelector('[data-stops-fields]');
     const update = () => {
       list.querySelectorAll('[data-stop-row]').forEach((row, index) => { row.querySelector('[data-stop-label]').textContent = `Stop ${index + 1}`; });
       add.disabled = list.querySelectorAll('[data-stop-row]').length >= 8;
@@ -705,6 +707,16 @@ document.querySelectorAll('[data-booking-form]').forEach(form => {
       remove.addEventListener('click', () => { row.remove(); update(); calculateRoute(form); });
       label.append(heading, input); row.append(label, remove); list.append(row);
       setupAddressAutocomplete(form, input); update();
+    });
+    selection?.addEventListener('change', () => {
+      const enabled = selection.value === 'yes';
+      if (fields) fields.hidden = !enabled;
+      if (enabled && !list.querySelector('[data-stop-row]')) add.click();
+      if (!enabled) { list.replaceChildren(); update(); }
+      form.elements.miles.value = 0;
+      if (form.elements.minutes) form.elements.minutes.value = 0;
+      calculateRide(form);
+      if (form.elements.pickup?.value && form.elements.delivery?.value && !enabled) calculateRoute(form);
     });
   }
   form.querySelector('[data-route-calc]')?.addEventListener('click', () => calculateRoute(form));
