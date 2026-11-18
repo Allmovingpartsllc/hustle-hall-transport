@@ -21,6 +21,19 @@ function bookingWindow(order) {
   return { start, end };
 }
 
+function bookingWindows(order) {
+  const outbound = bookingWindow(order?.rideType === 'round'
+    ? { ...order, minutes: order.outboundMinutes }
+    : order);
+  if (order?.rideType !== 'round') return outbound ? [outbound] : [];
+  const returnTrip = bookingWindow({
+    date: order.returnDate,
+    time: order.returnTime,
+    minutes: order.returnMinutes
+  });
+  return outbound && returnTrip ? [outbound, returnTrip] : [];
+}
+
 function overlaps(a, b) {
   return Boolean(a && b && a.start < b.end && b.start < a.end);
 }
@@ -86,8 +99,8 @@ module.exports = async function handler(req, res) {
     return res.status(503).json({ error: 'Secure booking availability is not configured.' });
   }
 
-  const requestedWindow = bookingWindow(order);
-  if (!requestedWindow) {
+  const requestedWindows = bookingWindows(order);
+  if (!requestedWindows.length) {
     return res.status(200).json({
       requiresApproval: true,
       reason: 'The ride schedule could not be compared automatically.'
@@ -109,7 +122,8 @@ module.exports = async function handler(req, res) {
     for (const row of rows) {
       const existing = { ...(row.payload || {}), status: row.status || row.payload?.status };
       if (NON_BLOCKING_STATUSES.has(existing.status)) continue;
-      if (!overlaps(requestedWindow, bookingWindow(existing))) continue;
+      const existingWindows = bookingWindows(existing);
+      if (!requestedWindows.some(requested => existingWindows.some(booked => overlaps(requested, booked)))) continue;
       conflicts.push({ id: row.id, service: existing.service || row.payload?.service || 'request' });
     }
 
