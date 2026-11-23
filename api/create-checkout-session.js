@@ -20,24 +20,24 @@ function isTuesdayFiveEligible(order) {
 }
 
 function calculatePromoDiscount(order, subtotal) {
-  const autoDiscount = order.service === 'ride' ? subtotal * 0.2 : 0;
-  if (isTuesdayFiveEligible(order)) return Math.max(autoDiscount, subtotal - 5);
+  if (isTuesdayFiveEligible(order)) return Math.max(0, subtotal - 5);
 
   const code = String(order.promoCode || '').trim().toUpperCase();
-  if (!code || code === 'TUESDAY5' || code === 'AUTO20') return autoDiscount;
+  // Preserve the agreed total of orders created before the automatic offer was removed.
+  if (code === 'AUTO20') return subtotal * 0.2;
+  if (!code || code === 'TUESDAY5') return 0;
 
   const promo = PROMO_CODES[code];
-  if (!promo) return autoDiscount;
-  if (promo.service && promo.service !== order.service) return autoDiscount;
+  if (!promo || (promo.service && promo.service !== order.service)) return 0;
 
   const minimum = Math.max(PROMO_MINIMUM_SUBTOTAL, promo.minimumSubtotal || 0);
-  if (subtotal < minimum) return autoDiscount;
+  if (subtotal < minimum) return 0;
 
   const rawDiscount = promo.type === 'percent'
     ? subtotal * (promo.value / 100)
     : promo.value;
 
-  return Math.max(autoDiscount, Math.min(subtotal, promo.maxDiscount || rawDiscount, rawDiscount));
+  return Math.min(subtotal, promo.maxDiscount ?? rawDiscount, rawDiscount);
 }
 
 function calculateCombinedInvoiceTotal(order) {
