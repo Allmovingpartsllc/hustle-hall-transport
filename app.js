@@ -111,13 +111,6 @@ function calculatePromo(form, subtotal, options = {}) {
     accepted = true;
     messageText = `${code} applied: ${promo.label}.`;
   }
-  // Automatic ride discount, or whichever eligible offer saves the rider more.
-  if (validRideRoute && isMultiRideReady && hasEligibleSubtotal && subtotal * 0.20 > discount) {
-    discount = subtotal * 0.20;
-    code = 'AUTO20';
-    accepted = true;
-    messageText = '20% ride discount automatically applied. No code required.';
-  }
   // Guard against malformed amounts or future promo configuration changes.
   discount = Number.isFinite(discount) ? Math.max(0, Math.min(subtotal, discount)) : 0;
   if (message) {
@@ -127,7 +120,7 @@ function calculatePromo(form, subtotal, options = {}) {
   }
   if (discountRow) discountRow.hidden = !discount;
   if (discountValue) discountValue.textContent = `-${money(discount)}`;
-  return { promoCode: accepted ? code : '', promoDiscount: discount, promoLabel: accepted ? (code === 'AUTO20' ? 'Automatic 20% off' : (PROMO_CODES[code]?.label || '')) : '', promoPending: pending, autoPromo: accepted && code === 'TUESDAY5' };
+  return { promoCode: accepted ? code : '', promoDiscount: discount, promoLabel: accepted ? (PROMO_CODES[code]?.label || '') : '', promoPending: pending, autoPromo: accepted && code === 'TUESDAY5' };
 }
 const makeId = () => `HHT-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}-${String(Date.now()).slice(-5)}`;
 
@@ -271,7 +264,7 @@ function addSchedulingFields() {
 
 addSchedulingFields();
 
-document.querySelector('[data-service="ride"] .quote-card p:last-child')?.replaceChildren('No surge pricing. $3 base plus $0.85/mile for the first 20 miles, $0.75/mile after that, and $0.12/minute ($5 minimum before discounts). Automatic 20% savings are included. Tolls and route changes can affect the quote.');
+document.querySelector('[data-service="ride"] .quote-card p:last-child')?.replaceChildren('No surge pricing. $3 base plus $0.85/mile for the first 20 miles, $0.75/mile after that, and $0.12/minute ($5 minimum before discounts). Tolls and route changes can affect the quote.');
 
 function addPaymentFields() {
   document.querySelectorAll('[data-booking-form]').forEach((form) => {
@@ -343,10 +336,10 @@ function setupMultiRideBooking(form) {
     if (form.elements.promoCode) form.elements.promoCode.disabled = false;
     form.querySelector('.quote-total span')?.replaceChildren(isMultiRide ? 'Pre-approval estimate' : 'Estimated fare');
     quoteText.textContent = isRoundTrip
-      ? 'Round trips include two separately calculated legs, with a $3 base fare per leg. Select your return date and pickup time. Automatic 20% ride savings apply when the complete route is valid.'
+      ? 'Round trips include two separately calculated legs, with a $3 base fare per leg. Select your return date and pickup time. Enter a promo code to see any eligible discount.'
       : isMultiRide
       ? 'Choose whether you need one ride per service day or two rides per service day. Your pre-approval estimate is calculated using the number of service days multiplied by your selected rides per day. We will confirm availability and the final schedule before payment; route changes, added stops, tolls, or schedule changes may change the final price.'
-      : 'No surge pricing. $3 base plus $0.85/mile for the first 20 miles, $0.75/mile after that, and $0.12/minute ($5 minimum before discounts). Automatic 20% savings are included. Tolls and route changes can affect the quote.';
+      : 'No surge pricing. $3 base plus $0.85/mile for the first 20 miles, $0.75/mile after that, and $0.12/minute ($5 minimum before discounts). Tolls and route changes can affect the quote.';
     calculateRide(form);
   };
   rideType.addEventListener('change', refresh);
